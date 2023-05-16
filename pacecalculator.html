@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Pace Calculator</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+
+    h1 {
+      text-align: center;
+    }
+
+    h2 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .input-container {
+      margin-bottom: 10px;
+    }
+
+    label {
+      display: block;
+      font-weight: bold;
+    }
+
+    input[type="number"] {
+      width: 100%;
+      padding: 5px;
+      border: 1px solid #ccc;
+    }
+
+    button {
+      display: block;
+      width: 100%;
+      padding: 10px;
+      background-color: #4CAF50;
+      color: #fff;
+      border: none;
+      cursor: pointer;
+    }
+
+    .output-container {
+      margin-top: 20px;
+      font-weight: bold;
+    }
+    .plus-button{
+        margin-bottom: 10px;
+        width: 20%;
+        margin: auto;
+    }
+    .pace-button{
+        margin-top: 10px;
+    }
+    .container {
+        width: 50%;
+        margin: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>Pace Calculator</h1>
+  <h2>Bislett Special</h2>
+  <div class="container">
+    <div id="inputs">
+        <div class="input-container">
+          <label for="distance">Distance (in meters):</label>
+          <input type="number" class="distance-input" step="1">
+        </div>
+    
+        <div class="input-container">
+          <label for="time">Time (in seconds):</label>
+          <input type="number" class="time-input" step="1">
+        </div>
+      </div>
+    
+      <button class="plus-button" onclick="addInput()">+</button>
+    
+      <button class="pace-button" onclick="calculatePace()">Calculate Pace</button>
+    
+      <div id="result" class="output-container"></div>
+  </div>
+
+  
+
+  <script>
+    function addInput() {
+      var inputsContainer = document.getElementById("inputs");
+
+      var distanceInput = document.createElement("input");
+      distanceInput.type = "number";
+      distanceInput.className = "distance-input";
+      distanceInput.step = "1";
+
+      var distanceContainer = document.createElement("div");
+      distanceContainer.className = "input-container";
+      distanceContainer.appendChild(document.createTextNode("Distance (in meters):"));
+      distanceContainer.appendChild(distanceInput);
+
+      var timeInput = document.createElement("input");
+      timeInput.type = "number";
+      timeInput.className = "time-input";
+      timeInput.step = "1";
+
+      var timeContainer = document.createElement("div");
+      timeContainer.className = "input-container";
+      timeContainer.appendChild(document.createTextNode("Time (in seconds):"));
+      timeContainer.appendChild(timeInput);
+
+      inputsContainer.appendChild(distanceContainer);
+      inputsContainer.appendChild(timeContainer);
+    }
+
+    function calculatePace() {
+        var distanceInputs = document.getElementsByClassName("distance-input");
+        var timeInputs = document.getElementsByClassName("time-input");
+        var resultDiv = document.getElementById("result");
+
+        var totalDistance = 0;
+        var totalSeconds = 0;
+
+        for (var i = 0; i < distanceInputs.length; i++) {
+            var distance = parseFloat(distanceInputs[i].value);
+            var time = parseFloat(timeInputs[i].value);
+
+            totalDistance += distance;
+            totalSeconds += time;
+        }
+
+        console.log(totalDistance / parseFloat(distanceInputs.length));
+        console.log(totalSeconds);
+
+        var averageDistance = totalDistance / parseFloat(distanceInputs.length);
+        var averagePaceSeconds = totalSeconds / parseFloat(distanceInputs.length);
+        var multiplier = 1000 / averageDistance;
+        var averagePaceSecondsPerKm = averagePaceSeconds * multiplier;
+        var averageMinutes = Math.floor(averagePaceSecondsPerKm / 60);
+        var averageSeconds = Math.round(averagePaceSecondsPerKm % 60);
+        var averagePace = averageMinutes + ":" + (averageSeconds < 10 ? "0" : "") + averageSeconds;
+
+        resultDiv.innerHTML = "Your average pace per kilometer: " + averagePace;
+        }
+
+</script>
+</body>
+</html>
