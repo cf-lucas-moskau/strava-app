@@ -138,7 +138,7 @@ function App() {
 
   const handleLogin = () => {
     const clientId = '107512';
-    const redirectUri = 'http:%2F%2Flocalhost:3000%2Fcallback';
+    const redirectUri = 'https:%2F%2Fstrava-app-gamma.vercel.app%2Fcallback';
     const scope = 'activity:read'; // Define the desired scope based on your needs
   
     const queryParams = {
@@ -149,7 +149,7 @@ function App() {
       scope: scope,
     };
   
-    const authorizationUrl = `https://www.strava.com/oauth/authorize?approval_prompt=force&client_id=107512&redirect_uri=http:%2F%2Flocalhost:3000%2Fcallback&response_type=code&scope=activity:read_all`;
+    const authorizationUrl = `https://www.strava.com/oauth/authorize?approval_prompt=force&client_id=107512&redirect_uri=https:%2F%2Fstrava-app-gamma.vercel.app%2Fcallback&response_type=code&scope=activity:read_all`;
   
     window.location.href = authorizationUrl;
   };
