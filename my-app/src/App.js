@@ -24,7 +24,7 @@ function App() {
   const [setDistance, setSetDistance] = useState(0);
 
   const trainingPlans = {
-    3294554: [
+    32945540: [
       {
         day: "2024-08-10",
         distance: 10011,
@@ -517,11 +517,7 @@ function App() {
                 <>
                   <h2>Not active trainingplan</h2>
                   {/* mailto link to lucas.moskau@web.de with the athlete.id in the subject */}
-                  <a
-                    href={`mailto:lucas.moskau@web.de?subject=&body=Ich%20h%C3%A4tte%20gerne%20einen%20Trainingsplan!`}
-                  >
-                    Request one
-                  </a>
+                  <a href={getMailString()}>Request one</a>
                 </>
               )}
               {athlete &&
