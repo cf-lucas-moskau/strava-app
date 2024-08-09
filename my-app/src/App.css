@@ -15,10 +15,44 @@ h2 {
 .input-container {
   margin-bottom: 10px;
 }
+.completed{
+  background-color: lightgreen;
+}
+.not-completed{
+  background-color: lightcoral;
+}
+
+.grid{
+  display: grid;
+  /* 4 elements per row */
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  /* center the whole grid */
+  margin: auto;
+  /* give some space between the elements */
+  grid-gap: 20px;
+}
+.training-day-card{
+  margin-bottom: 10px;
+  padding: 10px;
+  border: 1px solid black;
+  border-radius: 5px;
+  width: 200px;
+  margin: auto;
+}
+
 .load-button{
   width: 20%;
   margin: auto;
 }
+.margin-bottom-10{
+  margin-bottom: 10px;
+}
+.pace-button{
+  width: 20%;
+  margin: auto;
+  margin-top: 10px;
+}
+
 .lap-table-row{
   /* single row of the table, should get some nice styling*/
   border: 1px solid black;
