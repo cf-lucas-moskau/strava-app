@@ -24,7 +24,7 @@ function App() {
   const [setDistance, setSetDistance] = useState(0);
 
   const trainingPlans = {
-    32945540: [
+    3294554: [
       {
         day: "2024-08-10",
         distance: 10011,
@@ -384,7 +384,7 @@ function App() {
     // and then if a training distance is within 10% of the actual distance, I consider it completed
 
     // get the activities of the athlete
-    const athletesActivities = activities.filter((activity) => {
+    const athletesActivities = activities?.filter((activity) => {
       const activityDate = new Date(activity.start_date_local);
       return activityDate >= monday && activityDate <= sunday;
     });
@@ -395,7 +395,7 @@ function App() {
     // if they are, I consider the training completed
     thisWeeksTrainings.forEach((training) => {
       console.log("Checking training:", training);
-      const completed = athletesActivities.find((activity) => {
+      const completed = athletesActivities?.find((activity) => {
         const distanceDifference = Math.abs(
           training.distance - activity.distance
         );
@@ -418,7 +418,7 @@ function App() {
 
       if (!!completed) {
         // remove the activity from the list of activities
-        athletesActivities.splice(athletesActivities.indexOf(completed), 1);
+        athletesActivities?.splice(athletesActivities?.indexOf(completed), 1);
       }
     });
 
@@ -432,6 +432,13 @@ function App() {
     } else {
       setSelectedRows([...selectedRows, index]);
     }
+  };
+
+  const getMailString = () => {
+    console.log(
+      `mailto:lucas.moskau@web.de?subject=${athlete.id}&body=Ich%20h%C3%A4tte%20gerne%20einen%20Trainingsplan!`
+    );
+    return `mailto:lucas.moskau@web.de?subject=${athlete.id}&body=Ich%20h%C3%A4tte%20gerne%20einen%20Trainingsplan!`;
   };
 
   return (
@@ -507,7 +514,15 @@ function App() {
                   </div>
                 </>
               ) : (
-                <h2>Not part of the trainingplans</h2>
+                <>
+                  <h2>Not active trainingplan</h2>
+                  {/* mailto link to lucas.moskau@web.de with the athlete.id in the subject */}
+                  <a
+                    href={`mailto:lucas.moskau@web.de?subject=&body=Ich%20h%C3%A4tte%20gerne%20einen%20Trainingsplan!`}
+                  >
+                    Request one
+                  </a>
+                </>
               )}
               {athlete &&
               activities &&
