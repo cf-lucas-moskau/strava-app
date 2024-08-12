@@ -1,8 +1,12 @@
 import React, { useEffect, useState } from "react";
 import "./App.css";
 import axios from "axios";
+import MapComponent from "./components/MapComponent";
+import RunSilhouette from "./components/RunSilhouette";
 
 function App() {
+  const [mode, setMode] = useState("Lucas"); // Default mode is 'Lucas'
+
   const [distanceInputs, setDistanceInputs] = useState([]);
   const [timeInputs, setTimeInputs] = useState([]);
   const [result, setResult] = useState("");
@@ -191,6 +195,7 @@ function App() {
   const handleLogin = () => {
     console.log(window.location.href);
     const clientId = "107512";
+    const cliendIdSophia = "132094";
     const redirectUri = window.location.href.includes("localhost")
       ? "http:%2F%2Flocalhost:3000"
       : "https%3A%2F%2Fstrava-app-gamma.vercel.app";
@@ -206,7 +211,9 @@ function App() {
       scope: scope,
     };
 
-    const authorizationUrl = `https://www.strava.com/oauth/authorize?approval_prompt=force&client_id=107512&redirect_uri=${redirectUri}/callback&response_type=code&scope=activity:read_all`;
+    const authorizationUrl = `https://www.strava.com/oauth/authorize?approval_prompt=force&client_id=${
+      mode == "Sophia" ? cliendIdSophia : clientId
+    }&redirect_uri=${redirectUri}/callback&response_type=code&scope=activity:read_all`;
 
     window.location.href = authorizationUrl;
   };
@@ -348,6 +355,10 @@ function App() {
     localStorage.removeItem("accessToken");
   };
 
+  const toggleMode = () => {
+    setMode((prevMode) => (prevMode === "Lucas" ? "Sophia" : "Lucas"));
+  };
+
   const getThisWeeksTrainings = () => {
     if (!athlete || !athlete.id) {
       console.log("No athlete or athlete id");
@@ -443,6 +454,11 @@ function App() {
 
   return (
     <div>
+      <div style={{ position: "fixed", right: 20, top: 20 }}>
+        <button onClick={toggleMode} className="toggle-button">
+          Switch to {mode === "Lucas" ? "Sophia" : "Lucas"} mode
+        </button>
+      </div>
       {!athlete && (
         <button className="pace-button" onClick={handleLogin}>
           Login with Strava
@@ -564,6 +580,8 @@ function App() {
                 <h2>{activity.name}</h2>
                 <p>{formatMeterToKilometer(activity.distance)}</p>
               </button>
+              <MapComponent summaryPolyline={activity.map.summary_polyline} />
+              {/* <RunSilhouette summaryPolyline={activity.map.summary_polyline} /> */}
             </div>
           ))}
         {showSingleActivity && activity && (
