@@ -15,6 +15,86 @@ h2 {
 .input-container {
   margin-bottom: 10px;
 }
+
+.single-activities {
+  background-color: white;
+  border-radius: 10px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  margin-bottom: 20px;
+  padding: 20px;
+  max-width: 600px; /* Adjust the max-width as needed */
+  height: 470px;
+}
+
+.activity-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start; /* Ensure proper alignment of items */
+  margin-bottom: 15px;
+  cursor: pointer;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+}
+
+.profile-picture {
+  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  margin-right: 10px;
+}
+
+.user-details {
+  display: flex;
+  flex-direction: column;
+  justify-content: center; /* Center the text vertically */
+}
+
+.activity-name {
+  flex-grow: 1;
+  text-align: left;
+  margin-left: 20px;
+}
+
+.activity-name h2 {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: bold;
+  white-space: nowrap; /* Prevents text wrapping */
+}
+
+.activity-info {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: 10px;
+  font-size: 0.9rem;
+  font-weight: bold;
+}
+
+.activity-details {
+  display: flex;
+  gap: 20px;
+}
+
+.activity-details p {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.map-container {
+  margin-top: 10px;
+  height: 200px; /* Adjust height as needed */
+  width: 100%;
+}
+
+button {
+  all: unset;
+  cursor: pointer;
+}
+
 .completed{
   background-color: lightgreen;
 }
@@ -39,10 +119,14 @@ h2 {
   width: 200px;
   margin: auto;
 }
+.width-100{
+  width: 50px;
+}
 
 .load-button{
   width: 20%;
   margin: auto;
+  text-align: center;
 }
 .margin-bottom-10{
   margin-bottom: 10px;

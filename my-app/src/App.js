@@ -252,6 +252,24 @@ function App() {
     return (meters / 1000).toFixed(2) + " km";
   };
 
+  function formatPace(speed) {
+    const pace = 1000 / speed; // pace in seconds per kilometer
+    const minutes = Math.floor(pace / 60);
+    const seconds = Math.round(pace % 60)
+      .toString()
+      .padStart(2, "0");
+    return `${minutes}:${seconds}`;
+  }
+
+  function formatDuration(seconds) {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = Math.round(seconds % 60)
+      .toString()
+      .padStart(2, "0");
+    return hours > 0 ? `${hours}h ${minutes}min` : `${minutes}min ${secs}s`;
+  }
+
   const calculatePaceWithSetDistance = () => {
     setTimeout(() => {
       calculatePace();
@@ -474,7 +492,7 @@ function App() {
 
   return (
     <div>
-      <div style={{ position: "fixed", right: 20, top: 20 }}>
+      <div style={{ width: "170px", marginLeft: "auto", marginRight: "20px" }}>
         <button onClick={toggleMode} className="toggle-button">
           Switch to {mode === "Lucas" ? "Sophia" : "Lucas"} mode
         </button>
@@ -586,24 +604,71 @@ function App() {
           {/* show the athlete.profile in a small circle as profile picture */}
         </div>
       )}
+      {hideActivities && (
+        <button
+          className="load-button width-100"
+          onClick={() => setHideActivities(false)}
+        >
+          Back
+        </button>
+      )}
       <div className="activity-div">
         {!hideActivities &&
           activities &&
+          athlete &&
           activities.length &&
           activities.map((activity) => (
             <div key={activity.id} className="single-activities">
-              <button
-                onClick={() => {
-                  loadSingleActivity(activity.id);
-                }}
+              <div
+                className="activity-header"
+                onClick={() => loadSingleActivity(activity.id)}
               >
-                <h2>{activity.name}</h2>
-                <p>{formatMeterToKilometer(activity.distance)}</p>
-              </button>
-              <MapComponent summaryPolyline={activity.map.summary_polyline} />
-              {/* <RunSilhouette summaryPolyline={activity.map.summary_polyline} /> */}
+                {/* User Info and Activity Details */}
+                <div className="user-info">
+                  <div className="user-details">
+                    <p>
+                      {new Date(activity.start_date_local).toLocaleString()}
+                    </p>
+                    <p>
+                      {activity.location_city ||
+                        activity.location_state ||
+                        activity.location_country}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Activity Name and Description */}
+                <div className="activity-name">
+                  <p>{activity.name}</p>
+                  <p>{activity.description}</p>
+                </div>
+              </div>
+
+              {/* Additional Information */}
+              <div className="activity-info">
+                <div className="activity-details">
+                  <p>
+                    <strong>Distanz:</strong>{" "}
+                    {formatMeterToKilometer(activity.distance)}
+                  </p>
+                  <p>
+                    <strong>Tempo:</strong> {formatPace(activity.average_speed)}{" "}
+                    /km
+                  </p>
+                  <p>
+                    <strong>Zeit:</strong>{" "}
+                    {formatDuration(activity.elapsed_time)}
+                  </p>
+                </div>
+              </div>
+
+              {/* Map Component */}
+              <div className="map-container">
+                <MapComponent summaryPolyline={activity.map.summary_polyline} />
+              </div>
             </div>
           ))}
+
         {showSingleActivity && activity && (
           <div className="single-activity">
             <p>{activity.name}</p>
