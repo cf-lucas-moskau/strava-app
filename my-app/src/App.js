@@ -52,6 +52,22 @@ function App() {
         title: "Long run",
       },
     ],
+    71885025: [
+      // 2 trainings this week
+      // totalling up to 10 k, no time requirement
+      {
+        day: "2024-08-13",
+        distance: 6000,
+        description: "Ganz locker und easy",
+      },
+      {
+        day: "2024-08-12",
+        distance: 4000,
+        description: "Push day",
+        title:
+          "Hier kannst du dich gerne ein wenig pushen, dafür ist der Lauf aber auch kürzer!",
+      },
+    ],
   };
 
   const addInput = () => {
