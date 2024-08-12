@@ -78,6 +78,8 @@ function App() {
       return;
     }
     const clientId = "107512";
+    const cliendIdSophia = "132094";
+    const clientSecretSophia = "ba54e2ce83497f2618e1e84220975c89a906e094";
     const clientSecret = "1a8f803010a6cd40f81e426960729461ebc7523c";
     const redirectUri = "http:%2F%2Flocalhost:3000%2Fcallback"; // Replace with your specific redirect URI
 
@@ -85,8 +87,8 @@ function App() {
 
     try {
       const response = await axios.post(tokenUrl, {
-        client_id: clientId,
-        client_secret: clientSecret,
+        client_id: mode == "Lucas" ? clientId : cliendIdSophia,
+        client_secret: mode == "Lucas" ? clientSecret : clientSecretSophia,
         code: code,
         grant_type: "authorization_code",
         redirect_uri: redirectUri,
