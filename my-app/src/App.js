@@ -5,7 +5,7 @@ import MapComponent from "./components/MapComponent";
 import RunSilhouette from "./components/RunSilhouette";
 
 function App() {
-  const [mode, setMode] = useState("Lucas"); // Default mode is 'Lucas'
+  const [mode, setMode] = useState(localStorage.getItem("mode")); // Default mode is 'Lucas'
 
   const [distanceInputs, setDistanceInputs] = useState([]);
   const [timeInputs, setTimeInputs] = useState([]);
@@ -357,6 +357,8 @@ function App() {
 
   const toggleMode = () => {
     setMode((prevMode) => (prevMode === "Lucas" ? "Sophia" : "Lucas"));
+    // also write the mode to localStorage
+    localStorage.setItem("mode", mode === "Lucas" ? "Sophia" : "Lucas");
   };
 
   const getThisWeeksTrainings = () => {
