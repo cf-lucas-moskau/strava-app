@@ -3,6 +3,9 @@ import "./App.css";
 import axios from "axios";
 import MapComponent from "./components/MapComponent";
 import RunSilhouette from "./components/RunSilhouette";
+import PaceAnalysis from "./components/PaceAnalysis";
+import ThresholdAnalysis from "./components/ThresholdAnalysis";
+import * as Realm from "realm-web";
 
 function App() {
   const [mode, setMode] = useState(localStorage.getItem("mode")); // Default mode is 'Lucas'
@@ -13,10 +16,16 @@ function App() {
   const [accessToken, setAccessToken] = useState("");
   const [athlete, setAthlete] = useState(null);
   const [activities, setActivities] = useState(null);
+  const [filteredActivities, setFilteredActivities] = useState(null);
   const [hideActivities, setHideActivities] = useState(false);
   const [showSingleActivity, setShowSingleActivity] = useState(false);
   const [activity, setActivity] = useState(null);
   const [loadingActivities, setLoadingActivities] = useState(false);
+  const [savingActivities, setSavingActivities] = useState(false);
+
+  const [loadingAnalytics, setLoadingAnalytics] = useState(false);
+
+  const [detailedActivities, setDetailedActivities] = useState(null);
 
   const [showPaceCalculator, setShowPaceCalculator] = useState(false);
 
@@ -26,6 +35,14 @@ function App() {
   const [selectedRows, setSelectedRows] = useState([]);
 
   const [setDistance, setSetDistance] = useState(0);
+
+  const mongoApiKey =
+    "xUxMs0pTBssX9ylmTyk0MorcQwcCUjQEP9vA4IgZdKVJIjNsNEYqugQUDFhkAUYH";
+  const dataSource = "Cluster0";
+  const database = "development";
+  const appId = "application-0-vtsodnl";
+
+  const app = new Realm.App({ id: appId });
 
   const trainingPlans = {
     32945540: [
@@ -164,6 +181,62 @@ function App() {
     }
   };
 
+  const getActivitesFromDB = async () => {
+    if (!athlete) {
+      console.warn("No athlete, aborting!");
+      return;
+    }
+
+    // now fetch the activities from the database
+    const user = await app.logIn(Realm.Credentials.anonymous());
+    const activities = await user.functions.getActivitiesByAthleteId(
+      athlete.id
+    );
+
+    console.log("Activities from DB:", activities);
+    setDetailedActivities(activities);
+    // doesnt work because too much data
+    // localStorage.setItem("detailedActivities", JSON.stringify(activities));
+    return activities;
+  };
+
+  const loadAnalytics = async () => {
+    setLoadingAnalytics(true);
+    let _detailedActivities = detailedActivities;
+    if (!_detailedActivities) {
+      console.log("Need to fetch detailed activities first");
+      _detailedActivities = await getActivitesFromDB();
+    }
+    console.log("Detailed activities:", _detailedActivities);
+    setLoadingAnalytics(false);
+
+    // now we can analyze
+  };
+
+  const saveActivitiesToDB = async () => {
+    setSavingActivities(true);
+    const user = await app.logIn(Realm.Credentials.anonymous());
+    // Check and save each activity in your MongoDB via the Data API
+    let _detailedActivities = detailedActivities;
+    if (!detailedActivities) {
+      console.log("Need to fetch detailed activities first");
+      _detailedActivities = await getActivitesFromDB();
+    }
+    let counter = 0;
+    for (const activity of activities) {
+      // check if the activity is already in the database
+      const activityExists = _detailedActivities.find(
+        (act) => act.strava_id === activity.id
+      );
+      if (activityExists) {
+        console.log("Activity already exists in DB:", activity.id, counter++);
+        continue;
+      }
+      await checkAndSaveActivity(activity.id, accessToken, user);
+    }
+    setSavingActivities(false);
+  };
+
   const fetchActivities = async () => {
     setLoadingActivities(true);
     try {
@@ -174,7 +247,7 @@ function App() {
             Authorization: `Bearer ${accessToken}`,
           },
           params: {
-            per_page: 10,
+            per_page: 200,
           },
         }
       );
@@ -187,6 +260,19 @@ function App() {
       localStorage.setItem("activities", JSON.stringify(activities));
     } catch (error) {
       console.error("Error fetching activities:", error);
+    }
+  };
+
+  const checkAndSaveActivity = async (activityId, accessToken, user) => {
+    try {
+      const response = await user.functions.checkAndSaveActivity(
+        activityId,
+        accessToken
+      );
+
+      console.log(`Activity ${activityId} ${accessToken} processed:`, response);
+    } catch (error) {
+      console.error(`Error checking/saving activity ${activityId}:`, error);
     }
   };
 
@@ -296,10 +382,6 @@ function App() {
     }
     const today = new Date().toISOString().split("T")[0];
     return activities.find((activity) => {
-      console.log(
-        "Activity happened today?",
-        activity.start_date_local.split("T")[0] === today
-      );
       return activity.start_date_local.split("T")[0] === today;
     });
   };
@@ -375,6 +457,15 @@ function App() {
     const minutes = Math.floor(pace / 60);
     const seconds = Math.round(pace % 60);
     return `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
+  };
+
+  const filterActivites = (activityIds) => {
+    console.log("Filtering activities:", activityIds);
+    const filteredActivities = activities.filter((activity) =>
+      activityIds.includes(activity.id)
+    );
+    console.log("Filtered activities:", filteredActivities);
+    setFilteredActivities(filteredActivities);
   };
 
   const convertToPace = (numberToBeConverted) => {
@@ -594,12 +685,43 @@ function App() {
                 <h2>You haven't ran today... Go get after it!</h2>
               )}
             </div>
+            <div className="center-div">
+              <h1>Activity Analytics</h1>
+              <ThresholdAnalysis
+                detailedActivities={detailedActivities}
+                onWeekSelect={filterActivites}
+              />
+            </div>
+            <div>
+              <button className="load-button" onClick={loadAnalytics}>
+                Load analytics
+              </button>
+            </div>
+            {loadingAnalytics && <p>Loading analytics...</p>}
+
+            <div>
+              <button className="load-button" onClick={saveActivitiesToDB}>
+                Save activities to DB to allow for analytics
+              </button>
+            </div>
+            {savingActivities && <p>Saving activities...</p>}
+
             {true && (
               <button className="load-button" onClick={fetchActivities}>
                 Load newest activities
               </button>
             )}
             {loadingActivities && <p>Loading activities...</p>}
+            {filteredActivities && (
+              <button
+                className="load-button"
+                onClick={() => {
+                  setFilteredActivities(null);
+                }}
+              >
+                Remove filter
+              </button>
+            )}
           </div>
           {/* show the athlete.profile in a small circle as profile picture */}
         </div>
@@ -617,62 +739,70 @@ function App() {
           activities &&
           athlete &&
           activities.length &&
-          activities.map((activity) => (
-            <div key={activity.id} className="single-activities">
-              <div
-                className="activity-header"
-                onClick={() => loadSingleActivity(activity.id)}
-              >
-                {/* User Info and Activity Details */}
-                <div className="user-info">
-                  <div className="user-details">
+          (filteredActivities ? filteredActivities : activities).map(
+            (activity) => (
+              <div key={activity.id} className="single-activities">
+                <div
+                  className="activity-header"
+                  onClick={() => loadSingleActivity(activity.id)}
+                >
+                  {/* User Info and Activity Details */}
+                  <div className="user-info">
+                    <div className="user-details">
+                      <p>
+                        {new Date(activity.start_date_local).toLocaleString()}
+                      </p>
+                      <p>
+                        {activity.location_city ||
+                          activity.location_state ||
+                          activity.location_country}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Activity Name and Description */}
+                  <div className="activity-name">
+                    <p>{activity.name}</p>
+                    <p>{activity.description}</p>
+                  </div>
+                </div>
+
+                {/* Additional Information */}
+                <div className="activity-info">
+                  <div className="activity-details">
                     <p>
-                      {new Date(activity.start_date_local).toLocaleString()}
+                      <strong>Distanz:</strong>{" "}
+                      {formatMeterToKilometer(activity.distance)}
                     </p>
                     <p>
-                      {activity.location_city ||
-                        activity.location_state ||
-                        activity.location_country}
+                      <strong>Tempo:</strong>{" "}
+                      {formatPace(activity.average_speed)} /km
+                    </p>
+                    <p>
+                      <strong>Zeit:</strong>{" "}
+                      {formatDuration(activity.elapsed_time)}
                     </p>
                   </div>
                 </div>
 
-                {/* Activity Name and Description */}
-                <div className="activity-name">
-                  <p>{activity.name}</p>
-                  <p>{activity.description}</p>
+                {/* Map Component */}
+                <div className="map-container">
+                  <MapComponent
+                    summaryPolyline={activity.map.summary_polyline}
+                  />
                 </div>
+                {/* Pace Analysis Component */}
               </div>
-
-              {/* Additional Information */}
-              <div className="activity-info">
-                <div className="activity-details">
-                  <p>
-                    <strong>Distanz:</strong>{" "}
-                    {formatMeterToKilometer(activity.distance)}
-                  </p>
-                  <p>
-                    <strong>Tempo:</strong> {formatPace(activity.average_speed)}{" "}
-                    /km
-                  </p>
-                  <p>
-                    <strong>Zeit:</strong>{" "}
-                    {formatDuration(activity.elapsed_time)}
-                  </p>
-                </div>
-              </div>
-
-              {/* Map Component */}
-              <div className="map-container">
-                <MapComponent summaryPolyline={activity.map.summary_polyline} />
-              </div>
-            </div>
-          ))}
+            )
+          )}
 
         {showSingleActivity && activity && (
           <div className="single-activity">
             <p>{activity.name}</p>
             <p>{activity.description}</p>
+            <div className="pace-analysis-container">
+              <PaceAnalysis laps={activity.laps} />
+            </div>
             {/* a table that displays all laps of the activity */}
             <table className="lap-table">
               <thead>
@@ -706,7 +836,7 @@ function App() {
                         }
                       />
                     </td>
-                    <td>{lap.moving_time}</td>
+                    <td>{convertToPace((lap.moving_time / 60).toFixed(2))}</td>
                     <td>{lap.average_heartrate}</td>
                   </tr>
                 ))}

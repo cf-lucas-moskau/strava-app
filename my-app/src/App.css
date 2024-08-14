@@ -15,6 +15,18 @@ h2 {
 .input-container {
   margin-bottom: 10px;
 }
+.center-div{
+  /* I want this div to be centered */
+  margin: auto;
+  width: 50%;
+}
+.pace-analysis-container {
+  margin-top: 20px;
+  padding: 20px;
+  background-color: white;
+  border-radius: 10px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
 
 .single-activities {
   background-color: white;
@@ -126,6 +138,7 @@ button {
 .load-button{
   width: 20%;
   margin: auto;
+  margin-bottom: 15px;
   text-align: center;
 }
 .margin-bottom-10{
