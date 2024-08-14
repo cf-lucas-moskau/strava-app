@@ -7,6 +7,25 @@ import PaceAnalysis from "./components/PaceAnalysis";
 import ThresholdAnalysis from "./components/ThresholdAnalysis";
 import * as Realm from "realm-web";
 
+import {
+  Box,
+  Flex,
+  Text,
+  Image,
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+  PopoverArrow,
+  PopoverCloseButton,
+  PopoverBody,
+  Button,
+  Heading,
+  Grid,
+  Link,
+  Stack,
+  Spinner,
+} from "@chakra-ui/react";
+
 function App() {
   const [mode, setMode] = useState(localStorage.getItem("mode")); // Default mode is 'Lucas'
 
@@ -23,6 +42,7 @@ function App() {
   const [loadingActivities, setLoadingActivities] = useState(false);
   const [savingActivities, setSavingActivities] = useState(false);
 
+  const [allowAnalytics, setAllowAnalytics] = useState(false);
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
 
   const [detailedActivities, setDetailedActivities] = useState(null);
@@ -35,6 +55,7 @@ function App() {
   const [selectedRows, setSelectedRows] = useState([]);
 
   const [setDistance, setSetDistance] = useState(0);
+  const [showAnalytics, setShowAnalytics] = useState(false);
 
   const mongoApiKey =
     "xUxMs0pTBssX9ylmTyk0MorcQwcCUjQEP9vA4IgZdKVJIjNsNEYqugQUDFhkAUYH";
@@ -67,6 +88,38 @@ function App() {
         description:
           "Harter und langer lauf, letzte Vorbereitung vor dem Wettkampf",
         title: "Long run",
+      },
+      {
+        day: "2024-08-14",
+        distance: 25000,
+        time: 115,
+        description:
+          "Harter und langer lauf, letzte Vorbereitung vor dem Wettkampf",
+        title: "Long run",
+      },
+      {
+        day: "2024-08-14",
+        distance: 11000,
+        description: "Einfach nur entspannt laufen",
+        title: "Easy run",
+      },
+      {
+        day: "2024-08-14",
+        distance: 11000,
+        description: "Einfach nur entspannt laufen",
+        title: "Easy run",
+      },
+      {
+        day: "2024-08-14",
+        distance: 11000,
+        description: "Einfach nur entspannt laufen",
+        title: "Easy run",
+      },
+      {
+        day: "2024-08-14",
+        distance: 11000,
+        description: "Einfach nur entspannt laufen",
+        title: "Easy run",
       },
     ],
     71885025: [
@@ -202,6 +255,7 @@ function App() {
 
   const loadAnalytics = async () => {
     setLoadingAnalytics(true);
+    setShowAnalytics(true);
     let _detailedActivities = detailedActivities;
     if (!_detailedActivities) {
       console.log("Need to fetch detailed activities first");
@@ -235,6 +289,7 @@ function App() {
       await checkAndSaveActivity(activity.id, accessToken, user);
     }
     setSavingActivities(false);
+    setAllowAnalytics(true);
   };
 
   const fetchActivities = async () => {
@@ -583,149 +638,268 @@ function App() {
 
   return (
     <div>
-      <div style={{ width: "170px", marginLeft: "auto", marginRight: "20px" }}>
-        <button onClick={toggleMode} className="toggle-button">
-          Switch to {mode === "Lucas" ? "Sophia" : "Lucas"} mode
-        </button>
-      </div>
-      {!athlete && (
-        <button className="pace-button" onClick={handleLogin}>
-          Login with Strava
-        </button>
-      )}
+      <div>
+        <Box as="nav" bg="gray.800" paddingY={4} paddingX={4}>
+          <Flex
+            maxWidth="1200px"
+            margin="0 auto"
+            justify="space-between"
+            align="center"
+          >
+            {/* Logo or Site Title */}
+            <Heading as="h1" size="lg" color="white">
+              My App
+            </Heading>
 
-      {athlete && (
-        <div>
-          <div className="center-text margin-bottom-10">
-            <p className="margin-bottom-10">Hallo {athlete.firstname}!</p>
-            <img
-              src={athlete.profile}
-              alt="profile"
-              className="profile-picture"
-              onClick={() => {
-                logout();
-              }}
-            />
-            <div>
-              {/* This div is supposed to show if there is a daily challenge 
-                  It gets the trainingPlans and the activities and shows what the 
-                  athlete has to do today
-              */}
-              {athlete && athlete.id && trainingPlans[athlete.id] ? (
-                <>
-                  <h2>This weeks training</h2>
-                  <div className="grid">
-                    {getThisWeeksTrainings().map((event) => {
-                      return (
-                        <div
-                          className={
-                            "training-day-card " +
-                            (event.completed ? "completed" : "not-completed")
-                          }
-                          key={event.day + event.title + event.distance}
-                        >
-                          <h3>{event.title}</h3>
-                          <p>{event.description}</p>
-                          <p>{formatMeterToKilometer(event.distance)}</p>
-                          <p>
-                            {event.time
-                              ? "Need to complete in " +
-                                event.time +
-                                " minutes / " +
-                                convertToPace(
-                                  event.time / (event.distance / 1000)
-                                ) +
-                                " pace"
-                              : ""}
-                          </p>
-                          <p>
-                            {event.completed ? "Completed" : "Not Completed"}
-                          </p>
-                          {event.fullFilledTraining && (
-                            <p>
-                              You completed this training with a distance of{" "}
-                              {formatMeterToKilometer(
-                                event.fullFilledTraining.distance
-                              )}{" "}
-                              on{" "}
-                              {new Date(
-                                event.fullFilledTraining.start_date_local
-                              ).toLocaleDateString()}
-                            </p>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </>
-              ) : (
-                <>
-                  <h2>Not active trainingplan</h2>
-                  {/* mailto link to lucas.moskau@web.de with the athlete.id in the subject */}
-                  <a href={getMailString()}>Request one</a>
-                </>
+            {/* Right Side - Buttons */}
+            <Flex align="center">
+              <Button onClick={toggleMode} colorScheme="teal" marginRight={4}>
+                Switch to {mode === "Lucas" ? "Sophia" : "Lucas"} mode
+              </Button>
+              {!athlete && (
+                <Button onClick={handleLogin} colorScheme="orange">
+                  Login with Strava
+                </Button>
               )}
-              {athlete &&
-              activities &&
-              // check if the last activity happened on the day of the training
-              checkIfActivityHappenedToday() ? (
+            </Flex>
+          </Flex>
+        </Box>
+
+        {athlete && (
+          <Box padding={4}>
+            <Flex height="250px" align="center" justify="center">
+              <Box
+                textAlign="center"
+                padding={6}
+                borderRadius="md"
+                boxShadow="lg"
+                bg="gray.100"
+                height="200px"
+                display="flex"
+                flexDirection="column"
+                justifyContent="center"
+                alignItems="center"
+              >
+                <Text fontSize="2xl" marginBottom={4}>
+                  Hallo {athlete.firstname}!
+                </Text>
+
+                <Popover trigger="hover" placement="bottom">
+                  <PopoverTrigger>
+                    <Image
+                      src={athlete.profile}
+                      alt="profile"
+                      borderRadius="full"
+                      boxSize="100px"
+                      cursor="pointer"
+                      margin="0 auto"
+                    />
+                  </PopoverTrigger>
+                  <PopoverContent>
+                    <PopoverArrow />
+                    <PopoverCloseButton />
+                    <PopoverBody>Click to logout</PopoverBody>
+                  </PopoverContent>
+                </Popover>
+              </Box>
+            </Flex>
+
+            {athlete && athlete.id && trainingPlans[athlete.id] ? (
+              <>
+                <Heading as="h2" size="md" marginBottom={4}>
+                  This Week's Training
+                </Heading>
+                <Grid
+                  templateColumns="repeat(auto-fill, minmax(250px, 1fr))"
+                  gap={6}
+                  justifyItems="center"
+                  alignItems="center"
+                >
+                  {getThisWeeksTrainings().map((event) => (
+                    <Box
+                      key={event.day + event.title + event.distance}
+                      borderWidth="1px"
+                      borderRadius="md"
+                      padding={6}
+                      backgroundColor={
+                        event.completed ? "green.100" : "red.100"
+                      }
+                      boxShadow="md"
+                      width="100%"
+                      maxWidth="300px"
+                    >
+                      <Heading
+                        as="h3"
+                        size="md"
+                        marginBottom={4}
+                        textAlign="center"
+                      >
+                        {event.title}
+                      </Heading>
+                      <Text marginBottom={2} fontWeight="bold">
+                        {event.description}
+                      </Text>
+                      <Text marginBottom={2}>
+                        Distance: {formatMeterToKilometer(event.distance)}
+                      </Text>
+                      {event.time && (
+                        <Text marginBottom={2}>
+                          Need to complete in {event.time} minutes /{" "}
+                          {convertToPace(event.time / (event.distance / 1000))}{" "}
+                          pace
+                        </Text>
+                      )}
+                      <Text
+                        fontWeight="bold"
+                        color={event.completed ? "green.600" : "red.600"}
+                      >
+                        {event.completed ? "Completed" : "Not Completed"}
+                      </Text>
+                      {event.fullFilledTraining && (
+                        <Text marginTop={4} fontSize="sm" color="gray.600">
+                          You completed this training with a distance of{" "}
+                          {formatMeterToKilometer(
+                            event.fullFilledTraining.distance
+                          )}{" "}
+                          on{" "}
+                          {new Date(
+                            event.fullFilledTraining.start_date_local
+                          ).toLocaleDateString()}
+                        </Text>
+                      )}
+                    </Box>
+                  ))}
+                </Grid>
+              </>
+            ) : (
+              <>
+                <Heading as="h2" size="md" marginBottom={4}>
+                  No active training plan
+                </Heading>
+                <Link href={getMailString()} color="blue.500">
+                  Request one
+                </Link>
+              </>
+            )}
+
+            {/* <Box
+              width="100%"
+              maxWidth="400px"
+              margin="0 auto"
+              padding={6}
+              borderWidth="1px"
+              borderRadius="md"
+              boxShadow="md"
+              backgroundColor="gray.100"
+              marginTop={8}
+            >
+              {athlete && activities && checkIfActivityHappenedToday() ? (
                 <>
-                  <h2>Your run today</h2>
-                  <div>
-                    <p>
+                  <Heading
+                    as="h2"
+                    size="lg"
+                    textAlign="center"
+                    marginBottom={4}
+                  >
+                    Your Run Today
+                  </Heading>
+                  <Box>
+                    <Text fontSize="lg" fontWeight="bold" marginBottom={2}>
                       Distance: {formatMeterToKilometer(activities[0].distance)}
-                    </p>
-                    <p>
+                    </Text>
+                    <Text fontSize="lg" fontWeight="bold" marginBottom={2}>
                       Pace:{" "}
                       {metersPerSecondsToPace(activities[0].average_speed)}
-                    </p>
-                  </div>
+                    </Text>
+                  </Box>
                 </>
               ) : (
-                <h2>You haven't ran today... Go get after it!</h2>
+                <Heading as="h2" size="lg" textAlign="center" color="red.500">
+                  You haven't ran today... Go get after it!
+                </Heading>
               )}
-            </div>
-            <div className="center-div">
-              <h1>Activity Analytics</h1>
-              <ThresholdAnalysis
-                detailedActivities={detailedActivities}
-                onWeekSelect={filterActivites}
-              />
-            </div>
-            <div>
-              <button className="load-button" onClick={loadAnalytics}>
-                Load analytics
-              </button>
-            </div>
-            {loadingAnalytics && <p>Loading analytics...</p>}
+            </Box> */}
 
-            <div>
-              <button className="load-button" onClick={saveActivitiesToDB}>
-                Save activities to DB to allow for analytics
-              </button>
-            </div>
-            {savingActivities && <p>Saving activities...</p>}
-
-            {true && (
-              <button className="load-button" onClick={fetchActivities}>
-                Load newest activities
-              </button>
+            {showAnalytics && (
+              <Box textAlign="center" marginTop={8}>
+                <Heading as="h1" size="lg" marginBottom={4}>
+                  Activity Analytics
+                </Heading>
+                <ThresholdAnalysis
+                  detailedActivities={detailedActivities}
+                  onWeekSelect={filterActivites}
+                />
+              </Box>
             )}
-            {loadingActivities && <p>Loading activities...</p>}
-            {filteredActivities && (
-              <button
-                className="load-button"
-                onClick={() => {
-                  setFilteredActivities(null);
-                }}
+
+            {allowAnalytics && (
+              <Box marginTop={4} textAlign="center">
+                <Button
+                  onClick={loadAnalytics}
+                  colorScheme="teal"
+                  marginBottom={2}
+                  width="100%"
+                  maxWidth="300px"
+                >
+                  Load analytics
+                </Button>
+                {loadingAnalytics && (
+                  <Flex justifyContent="center">
+                    <Spinner color="teal.500" marginTop={2} />
+                  </Flex>
+                )}
+              </Box>
+            )}
+
+            <Box marginTop={allowAnalytics ? 4 : 10} textAlign="center">
+              <Button
+                onClick={saveActivitiesToDB}
+                colorScheme="teal"
+                marginBottom={2}
+                width="100%"
+                maxWidth="300px"
               >
-                Remove filter
-              </button>
+                Save activities to DB to allow for analytics
+              </Button>
+              {savingActivities && (
+                <Flex justifyContent="center">
+                  <Spinner color="teal.500" marginTop={2} />
+                </Flex>
+              )}
+            </Box>
+
+            <Box marginTop={4} textAlign="center">
+              <Button
+                onClick={fetchActivities}
+                colorScheme="teal"
+                marginBottom={2}
+                width="100%"
+                maxWidth="300px"
+              >
+                Load newest activities
+              </Button>
+              {loadingActivities && (
+                <Flex justifyContent="center">
+                  <Spinner color="teal.500" marginTop={2} />
+                </Flex>
+              )}
+            </Box>
+
+            {filteredActivities && (
+              <Box textAlign="center" marginTop={4}>
+                <Button
+                  onClick={() => setFilteredActivities(null)}
+                  colorScheme="red"
+                  width="100%"
+                  maxWidth="300px"
+                >
+                  Remove filter
+                </Button>
+              </Box>
             )}
-          </div>
-          {/* show the athlete.profile in a small circle as profile picture */}
-        </div>
-      )}
+          </Box>
+        )}
+      </div>
       {hideActivities && (
         <button
           className="load-button width-100"
@@ -741,58 +915,75 @@ function App() {
           activities.length &&
           (filteredActivities ? filteredActivities : activities).map(
             (activity) => (
-              <div key={activity.id} className="single-activities">
-                <div
-                  className="activity-header"
+              <Box
+                key={activity.id}
+                borderWidth="1px"
+                borderRadius="md"
+                boxShadow="md"
+                overflow="hidden"
+                padding={4}
+                marginBottom={6}
+                bg="white"
+              >
+                <Box
                   onClick={() => loadSingleActivity(activity.id)}
+                  cursor="pointer"
+                  _hover={{ bg: "gray.100" }}
+                  padding={4}
+                  borderRadius="md"
                 >
                   {/* User Info and Activity Details */}
-                  <div className="user-info">
-                    <div className="user-details">
-                      <p>
+                  <Flex justifyContent="space-between" marginBottom={4}>
+                    <Stack spacing={1}>
+                      <Text fontSize="sm" color="gray.600">
                         {new Date(activity.start_date_local).toLocaleString()}
-                      </p>
-                      <p>
+                      </Text>
+                      <Text fontSize="sm" color="gray.600">
                         {activity.location_city ||
                           activity.location_state ||
                           activity.location_country}
-                      </p>
-                    </div>
-                  </div>
+                      </Text>
+                    </Stack>
 
-                  {/* Activity Name and Description */}
-                  <div className="activity-name">
-                    <p>{activity.name}</p>
-                    <p>{activity.description}</p>
-                  </div>
-                </div>
+                    {/* Activity Name and Description */}
+                    <Stack spacing={1} textAlign="right">
+                      <Heading as="h3" size="md">
+                        {activity.name}
+                      </Heading>
+                      <Text fontSize="sm" color="gray.500">
+                        {activity.description}
+                      </Text>
+                    </Stack>
+                  </Flex>
+                </Box>
 
                 {/* Additional Information */}
-                <div className="activity-info">
-                  <div className="activity-details">
-                    <p>
+                <Box padding={4} borderTopWidth="1px" borderColor="gray.200">
+                  <Flex justifyContent="space-between">
+                    <Text>
                       <strong>Distanz:</strong>{" "}
                       {formatMeterToKilometer(activity.distance)}
-                    </p>
-                    <p>
+                    </Text>
+                    <Text>
                       <strong>Tempo:</strong>{" "}
                       {formatPace(activity.average_speed)} /km
-                    </p>
-                    <p>
+                    </Text>
+                    <Text>
                       <strong>Zeit:</strong>{" "}
                       {formatDuration(activity.elapsed_time)}
-                    </p>
-                  </div>
-                </div>
+                    </Text>
+                  </Flex>
+                </Box>
 
                 {/* Map Component */}
-                <div className="map-container">
+                <Box marginTop={4}>
                   <MapComponent
                     summaryPolyline={activity.map.summary_polyline}
                   />
-                </div>
-                {/* Pace Analysis Component */}
-              </div>
+                </Box>
+
+                {/* Optional: Add a section for Pace Analysis Component here */}
+              </Box>
             )
           )}
 
