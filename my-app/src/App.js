@@ -66,7 +66,40 @@ function App() {
   const app = new Realm.App({ id: appId });
 
   const trainingPlans = {
+    // Lucas
     32945540: [
+      {
+        day: "2024-08-19",
+        distance: 12000,
+        title: "Easy run",
+      },
+      {
+        day: "2024-08-19",
+        distance: 12000,
+        title: "Easy run",
+      },
+      {
+        day: "2024-08-19",
+        distance: 12000,
+        title: "Easy run",
+      },
+      {
+        day: "2024-08-19",
+        distance: 19000,
+        title: "Workout Fartlek",
+        description: "5 x 2km on @ 3:50 or faster / 1km float @ 4:30",
+      },
+      {
+        day: "2024-08-19",
+        distance: 25000,
+        title: "Double T",
+        description: "10 x 800m in the morning, Mikeller in the Evening",
+      },
+      {
+        day: "2024-08-19",
+        distance: 26000,
+        title: "Long run",
+      },
       {
         day: "2024-08-10",
         distance: 10011,
