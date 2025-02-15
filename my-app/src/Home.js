@@ -18,6 +18,10 @@ import {
   getAthlete,
   clearData,
 } from "./utils/db";
+import {
+  setupNotifications,
+  showTestNotification,
+} from "./utils/notifications";
 
 import {
   Box,
@@ -419,31 +423,70 @@ function Home() {
       // Try to load data from IndexedDB first
       const storedAthlete = await getAthlete();
       const storedActivities = await getActivities();
+      const storedAccessToken = localStorage.getItem("accessToken");
 
+      // Set stored data if available
       if (storedAthlete) {
         setAthlete(storedAthlete);
       }
       if (storedActivities.length > 0) {
         setActivities(storedActivities);
       }
-
-      // Then try to handle authorization and fetch fresh data
-      handleAuthorizationCallback();
-      const storedAccessToken = localStorage.getItem("accessToken");
       if (storedAccessToken) {
-        console.log("Already have Access token:", storedAccessToken);
         setAccessToken(storedAccessToken);
-        getAthlete(storedAccessToken);
+      }
+
+      // Only handle authorization if we're on the callback route
+      const isCallbackRoute = window.location.pathname === "/callback";
+      if (isCallbackRoute) {
+        await handleAuthorizationCallback();
+        return;
+      }
+
+      // If we don't have an access token, we're not authenticated
+      if (!storedAccessToken) {
+        console.log("No access token found, user needs to log in");
+        return;
+      }
+
+      // If we have an access token but no athlete data, fetch it
+      if (storedAccessToken && !storedAthlete) {
+        try {
+          await getAthlete(storedAccessToken);
+        } catch (error) {
+          console.error("Error fetching athlete:", error);
+          // If we get a 401, the token is invalid
+          if (error.response?.status === 401) {
+            logout();
+          }
+        }
       }
     };
 
     init();
   }, []);
 
-  // Add new useEffect to fetch activities when athlete is populated
+  // Add new useEffect to handle online/offline status
   useEffect(() => {
-    if (athlete && accessToken) {
-      console.log("Athlete populated, fetching activities...");
+    const handleOnline = async () => {
+      console.log("App is online, checking for updates");
+      if (accessToken) {
+        try {
+          await fetchActivities();
+        } catch (error) {
+          console.error("Error fetching activities while online:", error);
+        }
+      }
+    };
+
+    window.addEventListener("online", handleOnline);
+    return () => window.removeEventListener("online", handleOnline);
+  }, [accessToken]);
+
+  // Separate useEffect for fetching activities when we get an athlete
+  useEffect(() => {
+    if (athlete && accessToken && navigator.onLine) {
+      console.log("Athlete data available and online, fetching activities...");
       fetchActivities();
     }
   }, [athlete, accessToken]);
@@ -903,6 +946,16 @@ function Home() {
     });
   };
 
+  useEffect(() => {
+    if (athlete) {
+      setupNotifications().then((success) => {
+        if (success) {
+          console.log("Notifications set up successfully");
+        }
+      });
+    }
+  }, [athlete]);
+
   return (
     <div>
       {/* Loading overlay */}
@@ -947,17 +1000,32 @@ function Home() {
         {/* Add reload button */}
         {athlete && (
           <Box maxWidth="1200px" margin="0 auto" px={6} py={4}>
-            <Button
-              onClick={fetchActivities}
-              colorScheme="teal"
-              size="md"
-              width="100%"
-              isLoading={loadingActivities}
-              loadingText="Refreshing activities..."
-              leftIcon={<RepeatIcon />}
-            >
-              Refresh Activities
-            </Button>
+            <Flex gap={4}>
+              <Button
+                onClick={fetchActivities}
+                colorScheme="teal"
+                size="md"
+                flex="1"
+                isLoading={loadingActivities}
+                loadingText="Refreshing activities..."
+                leftIcon={<RepeatIcon />}
+              >
+                Refresh Activities
+              </Button>
+              <Button
+                onClick={() =>
+                  showTestNotification("Training Reminder", {
+                    body: "Don't forget your scheduled run today!",
+                    data: { url: window.location.origin },
+                  })
+                }
+                colorScheme="purple"
+                size="md"
+                flex="1"
+              >
+                Test Notification
+              </Button>
+            </Flex>
           </Box>
         )}
 

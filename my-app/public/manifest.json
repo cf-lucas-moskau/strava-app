@@ -20,11 +20,18 @@
       "purpose": "any maskable"
     }
   ],
-  "start_url": ".",
+  "start_url": "/",
   "display": "standalone",
   "theme_color": "#FC4C02",
   "background_color": "#ffffff",
   "orientation": "portrait",
   "description": "Track and analyze your Strava activities",
-  "prefer_related_applications": false
+  "prefer_related_applications": false,
+  "categories": ["fitness", "sports", "lifestyle"],
+  "screenshots": [],
+  "display_override": ["standalone", "minimal-ui"],
+  "scope": "/",
+  "launch_handler": {
+    "client_mode": ["focus-existing", "auto"]
+  }
 }

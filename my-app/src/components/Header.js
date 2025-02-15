@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Button,
@@ -11,15 +11,67 @@ import {
   MenuItem,
   Text,
   Avatar,
+  useToast,
 } from "@chakra-ui/react";
 import { Link } from "react-router-dom";
-import { ChevronDownIcon } from "@chakra-ui/icons";
+import { ChevronDownIcon, DownloadIcon } from "@chakra-ui/icons";
 
 const Header = ({ handleLogin, athlete, logout }) => {
-  // get url and check if it containcs "pace-calculator"
-
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const toast = useToast();
   const url = window.location.href;
   const isPaceCalculator = url.includes("pace-calculator");
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e) => {
+      // Prevent Chrome 67 and earlier from automatically showing the prompt
+      e.preventDefault();
+      // Stash the event so it can be triggered later
+      setDeferredPrompt(e);
+    };
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener(
+        "beforeinstallprompt",
+        handleBeforeInstallPrompt
+      );
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) {
+      toast({
+        title: "Installation not available",
+        description:
+          "Your browser or device might not support app installation, or the app might already be installed.",
+        status: "info",
+        duration: 5000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    // Show the install prompt
+    deferredPrompt.prompt();
+
+    // Wait for the user to respond to the prompt
+    const { outcome } = await deferredPrompt.userChoice;
+
+    if (outcome === "accepted") {
+      toast({
+        title: "Thanks for installing!",
+        description: "The app has been added to your home screen.",
+        status: "success",
+        duration: 3000,
+        isClosable: true,
+      });
+    }
+
+    // Clear the deferredPrompt
+    setDeferredPrompt(null);
+  };
 
   return (
     <Box
@@ -61,6 +113,18 @@ const Header = ({ handleLogin, athlete, logout }) => {
             >
               Pace Calculator
             </Button>
+
+            {deferredPrompt && (
+              <Button
+                onClick={handleInstallClick}
+                leftIcon={<DownloadIcon />}
+                colorScheme="orange"
+                variant="outline"
+                size="md"
+              >
+                Install App
+              </Button>
+            )}
 
             {athlete ? (
               <Menu>
