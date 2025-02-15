@@ -9,6 +9,8 @@ import PaceAnalysis from "./components/PaceAnalysis";
 import ThresholdAnalysis from "./components/ThresholdAnalysis";
 import * as Realm from "realm-web";
 import { EditIcon } from "@chakra-ui/icons";
+import { useNavigate } from "react-router-dom";
+import { useToast } from "@chakra-ui/react";
 
 import {
   Box,
@@ -27,10 +29,17 @@ import {
   Link,
   Stack,
   Spinner,
+  CircularProgress,
+  CircularProgressLabel,
 } from "@chakra-ui/react";
 import Activity from "./components/Activity";
+import TrainingCard from "./components/TrainingCard";
+import { RepeatIcon } from "@chakra-ui/icons";
 
 function Home() {
+  const navigate = useNavigate();
+  const toast = useToast();
+
   const [mode, setMode] = useState(localStorage.getItem("mode")); // Default mode is 'Lucas'
 
   const [distanceInputs, setDistanceInputs] = useState([]);
@@ -60,6 +69,8 @@ function Home() {
 
   const [setDistance, setSetDistance] = useState(0);
   const [showAnalytics, setShowAnalytics] = useState(false);
+
+  const [pullToRefreshDistance, setPullToRefreshDistance] = useState(0);
 
   const mongoApiKey =
     "xUxMs0pTBssX9ylmTyk0MorcQwcCUjQEP9vA4IgZdKVJIjNsNEYqugQUDFhkAUYH";
@@ -158,6 +169,36 @@ function Home() {
         description: "Einfach nur entspannt laufen",
         title: "Easy run",
       },
+      {
+        day: "2025-02-14",
+        distance: 11000,
+        description: "Einfach nur entspannt laufen",
+        title: "Easy run",
+      },
+      {
+        day: "2025-02-14",
+        distance: 11000,
+        description: "Einfach nur entspannt laufen",
+        title: "Easy run",
+      },
+      {
+        day: "2025-02-14",
+        distance: 11000,
+        description: "Einfach nur entspannt laufen",
+        title: "Easy run",
+      },
+      {
+        day: "2025-02-14",
+        distance: 11000,
+        description: "Einfach nur entspannt laufen",
+        title: "Easy run",
+      },
+      {
+        day: "2025-02-14",
+        distance: 11000,
+        description: "Einfach nur entspannt laufen",
+        title: "Easy run",
+      },
     ],
     71885025: [
       // 2 trainings this week
@@ -173,6 +214,24 @@ function Home() {
         description: "Push day",
         title:
           "Hier kannst du dich gerne ein wenig pushen, dafür ist der Lauf aber auch kürzer!",
+      },
+      {
+        day: "2025-02-14",
+        distance: 5000,
+        description: "mit Lucas",
+        title: "Sonntagslauf",
+      },
+      {
+        day: "2025-02-14",
+        distance: 3000,
+        description: "mit Lucas",
+        title: "Easy run",
+      },
+      {
+        day: "2025-02-14",
+        distance: 2500,
+        description: "mit Lucas",
+        title: "Coffee run",
       },
     ],
   };
@@ -225,20 +284,33 @@ function Home() {
   const handleAuthorizationCallback = async () => {
     const code = new URLSearchParams(window.location.search).get("code");
     if (!code) {
+      console.log("No authorization code found in URL");
       return;
     }
-    const clientId = "107512";
-    const cliendIdSophia = "132094";
-    const clientSecretSophia = "ba54e2ce83497f2618e1e84220975c89a906e094";
-    const clientSecret = "1a8f803010a6cd40f81e426960729461ebc7523c";
-    const redirectUri = "http:%2F%2Flocalhost:3000%2Fcallback"; // Replace with your specific redirect URI
+    console.log("Authorization code received:", code);
 
+    const clientId = "107512";
+    const clientSecret = "1a8f803010a6cd40f81e426960729461ebc7523c";
+
+    // Use the same redirect URI format as in the authorization request
+    const redirectUri = window.location.href.includes("localhost")
+      ? `${window.location.protocol}//${window.location.host}/callback`
+      : `${window.location.protocol}//strava-app-gamma.vercel.app/callback`;
+
+    console.log("Using redirect URI:", redirectUri);
     const tokenUrl = "https://www.strava.com/oauth/token";
 
     try {
+      console.log("Attempting to exchange code for token with params:", {
+        client_id: clientId,
+        code,
+        grant_type: "authorization_code",
+        redirect_uri: redirectUri,
+      });
+
       const response = await axios.post(tokenUrl, {
-        client_id: mode == "Lucas" ? clientId : cliendIdSophia,
-        client_secret: mode == "Lucas" ? clientSecret : clientSecretSophia,
+        client_id: clientId,
+        client_secret: clientSecret,
         code: code,
         grant_type: "authorization_code",
         redirect_uri: redirectUri,
@@ -249,13 +321,16 @@ function Home() {
       setAthlete(response.data.athlete);
       setAccessToken(accessToken);
       localStorage.setItem("accessToken", accessToken);
-      // remove parameters from URL now
-      window.history.replaceState({}, document.title, window.location.pathname);
+
+      // Navigate to home page after successful token exchange
+      navigate("/");
     } catch (error) {
-      console.error(
-        "Error exchanging authorization code for access token:",
-        error
-      );
+      console.error("Error exchanging authorization code for access token:", {
+        error: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        headers: error.response?.headers,
+      });
     }
   };
 
@@ -263,6 +338,53 @@ function Home() {
     const storedActivities = localStorage.getItem("activities");
     if (storedActivities) {
       setActivities(JSON.parse(storedActivities));
+    }
+  };
+
+  const fetchActivities = async () => {
+    if (!athlete || !accessToken) {
+      toast({
+        title: "Cannot refresh activities",
+        description: "Please log in first",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+        position: "top",
+      });
+      return;
+    }
+
+    setLoadingActivities(true);
+    try {
+      const response = await axios.get(
+        "https://www.strava.com/api/v3/athlete/activities",
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+          params: {
+            per_page: 200,
+          },
+        }
+      );
+
+      const activities = response.data;
+      setActivities(activities);
+      localStorage.setItem("activities", JSON.stringify(activities));
+      return activities;
+    } catch (error) {
+      console.error("Error fetching activities:", error);
+      toast({
+        title: "Error fetching activities",
+        description: error.response?.data?.message || "Please try again later",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+        position: "top",
+      });
+      throw error;
+    } finally {
+      setLoadingActivities(false);
     }
   };
 
@@ -276,6 +398,14 @@ function Home() {
       getAthlete(storedAccessToken);
     }
   }, []);
+
+  // Add new useEffect to fetch activities when athlete is populated
+  useEffect(() => {
+    if (athlete && accessToken) {
+      console.log("Athlete populated, fetching activities...");
+      fetchActivities();
+    }
+  }, [athlete, accessToken]);
 
   const loadSingleActivity = async (activityId) => {
     try {
@@ -356,32 +486,6 @@ function Home() {
     setAllowAnalytics(true);
   };
 
-  const fetchActivities = async () => {
-    setLoadingActivities(true);
-    try {
-      const response = await axios.get(
-        "https://www.strava.com/api/v3/athlete/activities",
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-          params: {
-            per_page: 200,
-          },
-        }
-      );
-
-      const activities = response.data;
-      console.log("Activities:", activities);
-      setActivities(activities);
-      setLoadingActivities(false);
-      // save the activities in localStorage
-      localStorage.setItem("activities", JSON.stringify(activities));
-    } catch (error) {
-      console.error("Error fetching activities:", error);
-    }
-  };
-
   const checkAndSaveActivity = async (activityId, accessToken, user) => {
     try {
       const response = await user.functions.checkAndSaveActivity(
@@ -418,7 +522,6 @@ function Home() {
   const handleLogin = () => {
     console.log(window.location.href);
     const clientId = "107512";
-    const cliendIdSophia = "132094";
     const redirectUri = window.location.href.includes("localhost")
       ? "http:%2F%2Flocalhost:3000"
       : "https%3A%2F%2Fstrava-app-gamma.vercel.app";
@@ -434,9 +537,7 @@ function Home() {
       scope: scope,
     };
 
-    const authorizationUrl = `https://www.strava.com/oauth/authorize?approval_prompt=force&client_id=${
-      mode == "Sophia" ? cliendIdSophia : clientId
-    }&redirect_uri=${redirectUri}/callback&response_type=code&scope=activity:read_all,activity:write`;
+    const authorizationUrl = `https://www.strava.com/oauth/authorize?approval_prompt=force&client_id=${clientId}&redirect_uri=${redirectUri}/callback&response_type=code&scope=activity:read_all,activity:write`;
 
     window.location.href = authorizationUrl;
   };
@@ -638,23 +739,20 @@ function Home() {
       return activityDate >= monday && activityDate <= sunday;
     });
 
-    // now I want to add an additional field to it that shows me if the activity has been completed
-    // I do that by getting the activities of the athlete of the current week
-    // and then if a training distance is within 10% of the actual distance, I consider it completed
+    // get the activities of the athlete for this week
+    const athletesActivities =
+      activities?.filter((activity) => {
+        const activityDate = new Date(activity.start_date_local);
+        return activityDate >= monday && activityDate <= sunday;
+      }) || [];
 
-    // get the activities of the athlete
-    const athletesActivities = activities?.filter((activity) => {
-      const activityDate = new Date(activity.start_date_local);
-      return activityDate >= monday && activityDate <= sunday;
-    });
-
-    console.log("athleteActivites:", athletesActivities);
+    // Create a copy of athletesActivities that we can modify
+    let remainingActivities = [...athletesActivities];
 
     // now I want to check if the activities are within 10% of the training distance
     // if they are, I consider the training completed
     thisWeeksTrainings.forEach((training) => {
-      console.log("Checking training:", training);
-      const completed = athletesActivities?.find((activity) => {
+      const completed = remainingActivities.find((activity) => {
         const distanceDifference = Math.abs(
           training.distance - activity.distance
         );
@@ -672,16 +770,25 @@ function Home() {
         }
       });
 
-      training.completed = !!completed ? true : false;
+      training.completed = !!completed;
       training.fullFilledTraining = completed;
 
-      if (!!completed) {
-        // remove the activity from the list of activities
-        athletesActivities?.splice(athletesActivities?.indexOf(completed), 1);
+      if (completed) {
+        // remove the activity from the remaining activities
+        remainingActivities = remainingActivities.filter(
+          (activity) => activity.id !== completed.id
+        );
       }
     });
 
+    // Store the remaining unmatched activities
+    window.unmatchedActivities = remainingActivities;
+
     return thisWeeksTrainings;
+  };
+
+  const getUnmatchedActivities = () => {
+    return window.unmatchedActivities || [];
   };
 
   const handleRowSelection = (index) => {
@@ -694,220 +801,364 @@ function Home() {
   };
 
   const getMailString = () => {
-    console.log(
-      `mailto:lucas.moskau@web.de?subject=${athlete.id}&body=Ich%20h%C3%A4tte%20gerne%20einen%20Trainingsplan!`
-    );
+    if (!athlete || !athlete.id) {
+      return "#";
+    }
     return `mailto:lucas.moskau@web.de?subject=${athlete.id}&body=Ich%20h%C3%A4tte%20gerne%20einen%20Trainingsplan!`;
+  };
+
+  const getThisWeeksActivities = () => {
+    if (!activities) return [];
+
+    const today = new Date();
+    const dayOfWeek = today.getDay();
+    const diffToMonday = (dayOfWeek === 0 ? -6 : 1) - dayOfWeek;
+
+    const monday = new Date(today);
+    monday.setDate(today.getDate() + diffToMonday);
+    monday.setHours(0, 0, 0, 0);
+
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    sunday.setHours(23, 59, 59, 999);
+
+    // Get this week's trainings
+    const thisWeeksTrainings = getThisWeeksTrainings();
+
+    // Filter activities to this week first
+    const thisWeeksActivities = activities.filter((activity) => {
+      const activityDate = new Date(activity.start_date_local);
+      return activityDate >= monday && activityDate <= sunday;
+    });
+
+    // Filter out activities that have been matched to trainings
+    return thisWeeksActivities.filter((activity) => {
+      // Check if this activity matches any training
+      const isMatched = thisWeeksTrainings.some((training) => {
+        const distanceDifference = Math.abs(
+          training.distance - activity.distance
+        );
+        if (training.time) {
+          const timeDifference = Math.abs(
+            training.time - activity.moving_time / 60
+          );
+          return (
+            distanceDifference < training.distance * 0.15 &&
+            timeDifference < training.time * 0.15
+          );
+        }
+        return distanceDifference < training.distance * 0.15;
+      });
+      return !isMatched;
+    });
+  };
+
+  const getAllThisWeeksActivities = () => {
+    if (!activities) return [];
+
+    const today = new Date();
+    const dayOfWeek = today.getDay();
+    const diffToMonday = (dayOfWeek === 0 ? -6 : 1) - dayOfWeek;
+
+    const monday = new Date(today);
+    monday.setDate(today.getDate() + diffToMonday);
+    monday.setHours(0, 0, 0, 0);
+
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    sunday.setHours(23, 59, 59, 999);
+
+    // Return all activities within this week
+    return activities.filter((activity) => {
+      const activityDate = new Date(activity.start_date_local);
+      return activityDate >= monday && activityDate <= sunday;
+    });
   };
 
   return (
     <div>
+      {/* Loading overlay */}
+      {loadingActivities && (
+        <Box
+          position="fixed"
+          top="0"
+          left="0"
+          right="0"
+          bottom="0"
+          bg="blackAlpha.300"
+          zIndex="overlay"
+          display="flex"
+          alignItems="center"
+          justifyContent="center"
+          backdropFilter="blur(2px)"
+        >
+          <Box
+            bg="white"
+            p={6}
+            borderRadius="lg"
+            boxShadow="xl"
+            textAlign="center"
+          >
+            <Spinner
+              size="xl"
+              color="teal.500"
+              thickness="4px"
+              speed="0.65s"
+              mb={4}
+            />
+            <Text fontWeight="medium" color="gray.700">
+              Loading activities...
+            </Text>
+          </Box>
+        </Box>
+      )}
+
       <div>
-        <Header
-          handleLogin={handleLogin}
-          athlete={athlete}
-          mode={mode}
-          toggleMode={toggleMode}
-        />
+        <Header handleLogin={handleLogin} athlete={athlete} logout={logout} />
 
+        {/* Add reload button */}
         {athlete && (
-          <Box padding={4}>
-            <Flex height="250px" align="center" justify="center">
-              <Box
-                textAlign="center"
-                padding={6}
-                borderRadius="md"
-                boxShadow="lg"
-                bg="gray.100"
-                height="200px"
-                display="flex"
-                flexDirection="column"
-                justifyContent="center"
-                alignItems="center"
-              >
-                <Text fontSize="2xl" marginBottom={4}>
-                  Hallo {athlete.firstname}!
-                </Text>
-
-                <Popover trigger="hover" placement="bottom">
-                  <PopoverTrigger>
-                    <Image
-                      src={athlete.profile}
-                      alt="profile"
-                      borderRadius="full"
-                      boxSize="100px"
-                      cursor="pointer"
-                      margin="0 auto"
-                      onClick={logout}
-                    />
-                  </PopoverTrigger>
-                  <PopoverContent>
-                    <PopoverArrow />
-                    <PopoverCloseButton />
-                    <PopoverBody>Click to logout</PopoverBody>
-                  </PopoverContent>
-                </Popover>
-              </Box>
-            </Flex>
-
-            {athlete && athlete.id && trainingPlans[athlete.id] ? (
-              <>
-                <Heading as="h2" size="md" marginBottom={4}>
-                  This Week's Training
-                </Heading>
-                <Grid
-                  templateColumns="repeat(auto-fill, minmax(250px, 1fr))"
-                  gap={6}
-                  justifyItems="center"
-                  alignItems="center"
-                >
-                  {getThisWeeksTrainings().map((event) => (
-                    <Box
-                      key={event.day + event.title + event.distance}
-                      borderWidth="1px"
-                      borderRadius="md"
-                      padding={6}
-                      backgroundColor={
-                        event.completed ? "green.100" : "red.100"
-                      }
-                      boxShadow="md"
-                      width="100%"
-                      maxWidth="300px"
-                    >
-                      <Heading
-                        as="h3"
-                        size="md"
-                        marginBottom={4}
-                        textAlign="center"
-                      >
-                        {event.title}
-                      </Heading>
-                      <Text marginBottom={2} fontWeight="bold">
-                        {event.description}
-                      </Text>
-                      <Text marginBottom={2}>
-                        Distance: {formatMeterToKilometer(event.distance)}
-                      </Text>
-                      {event.time && (
-                        <Text marginBottom={2}>
-                          Need to complete in {event.time} minutes /{" "}
-                          {convertToPace(event.time / (event.distance / 1000))}{" "}
-                          pace
-                        </Text>
-                      )}
-                      <Text
-                        fontWeight="bold"
-                        color={event.completed ? "green.600" : "red.600"}
-                      >
-                        {event.completed ? "Completed" : "Not Completed"}
-                      </Text>
-                      {event.fullFilledTraining && (
-                        <Text marginTop={4} fontSize="sm" color="gray.600">
-                          You completed this training with a distance of{" "}
-                          {formatMeterToKilometer(
-                            event.fullFilledTraining.distance
-                          )}{" "}
-                          on{" "}
-                          {new Date(
-                            event.fullFilledTraining.start_date_local
-                          ).toLocaleDateString()}
-                        </Text>
-                      )}
-                    </Box>
-                  ))}
-                </Grid>
-              </>
-            ) : (
-              <>
-                <Heading as="h2" size="md" marginBottom={4}>
-                  No active training plan
-                </Heading>
-                <Link href={getMailString()} color="blue.500">
-                  Request one
-                </Link>
-              </>
-            )}
-
-            {showAnalytics && (
-              <Box textAlign="center" marginTop={8}>
-                <Heading as="h1" size="lg" marginBottom={4}>
-                  Activity Analytics
-                </Heading>
-                {/* <ThresholdAnalysis
-                  detailedActivities={detailedActivities}
-                  onWeekSelect={filterActivites}
-                /> */}
-                <WeeklySummary activities={detailedActivities} />
-              </Box>
-            )}
-
-            {allowAnalytics && (
-              <Box marginTop={4} textAlign="center">
-                <Button
-                  onClick={loadAnalytics}
-                  colorScheme="teal"
-                  marginBottom={2}
-                  width="100%"
-                  maxWidth="300px"
-                >
-                  Load analytics
-                </Button>
-                {loadingAnalytics && (
-                  <Flex justifyContent="center">
-                    <Spinner color="teal.500" marginTop={2} />
-                  </Flex>
-                )}
-              </Box>
-            )}
-
-            <Box marginTop={allowAnalytics ? 4 : 10} textAlign="center">
-              <Button
-                onClick={saveActivitiesToDB}
-                colorScheme="teal"
-                marginBottom={2}
-                width="100%"
-                maxWidth="300px"
-              >
-                Save activities to DB to allow for analytics
-              </Button>
-              {savingActivities && (
-                <Flex justifyContent="center">
-                  <Spinner color="teal.500" marginTop={2} />
-                </Flex>
-              )}
-            </Box>
-
-            <Box marginTop={4} textAlign="center">
-              <Button
-                onClick={fetchActivities}
-                colorScheme="teal"
-                marginBottom={2}
-                width="100%"
-                maxWidth="300px"
-              >
-                Load newest activities
-              </Button>
-              {loadingActivities && (
-                <Flex justifyContent="center">
-                  <Spinner color="teal.500" marginTop={2} />
-                </Flex>
-              )}
-            </Box>
-
-            {filteredActivities && (
-              <Box textAlign="center" marginTop={4}>
-                <Button
-                  onClick={() => setFilteredActivities(null)}
-                  colorScheme="red"
-                  width="100%"
-                  maxWidth="300px"
-                >
-                  Remove filter
-                </Button>
-              </Box>
-            )}
+          <Box maxWidth="1200px" margin="0 auto" px={6} py={4}>
+            <Button
+              onClick={fetchActivities}
+              colorScheme="teal"
+              size="md"
+              width="100%"
+              isLoading={loadingActivities}
+              loadingText="Refreshing activities..."
+              leftIcon={<RepeatIcon />}
+            >
+              Refresh Activities
+            </Button>
           </Box>
         )}
+
+        <Box maxWidth="1200px" margin="0 auto" px={6}>
+          {athlete && athlete.id && trainingPlans[athlete.id] ? (
+            <Box>
+              <Flex
+                justify="space-between"
+                align="center"
+                mb={6}
+                borderBottom="1px"
+                borderColor="gray.200"
+                pb={4}
+              >
+                <Box>
+                  <Heading as="h2" size="lg" mb={2}>
+                    This Week's Training
+                  </Heading>
+                  <Text color="gray.600">
+                    Your training plan for{" "}
+                    {new Date().toLocaleDateString("en-US", {
+                      month: "long",
+                      year: "numeric",
+                    })}
+                  </Text>
+                </Box>
+                <Flex align="center" gap={8}>
+                  <Box textAlign="right">
+                    <Text fontSize="lg" fontWeight="bold" color="gray.700">
+                      Weekly Progress
+                    </Text>
+                    <Text fontSize="sm" color="gray.600">
+                      {formatMeterToKilometer(
+                        getAllThisWeeksActivities().reduce(
+                          (acc, curr) => acc + curr.distance,
+                          0
+                        )
+                      )}{" "}
+                      of{" "}
+                      {formatMeterToKilometer(
+                        getThisWeeksTrainings().reduce(
+                          (acc, curr) => acc + curr.distance,
+                          0
+                        )
+                      )}
+                    </Text>
+                  </Box>
+                  <Box position="relative" width="100px" height="100px">
+                    <CircularProgress
+                      value={
+                        (getAllThisWeeksActivities().reduce(
+                          (acc, curr) => acc + curr.distance,
+                          0
+                        ) /
+                          getThisWeeksTrainings().reduce(
+                            (acc, curr) => acc + curr.distance,
+                            0
+                          )) *
+                        100
+                      }
+                      color="teal.400"
+                      size="100px"
+                      thickness="8px"
+                    >
+                      <CircularProgressLabel>
+                        {Math.round(
+                          (getAllThisWeeksActivities().reduce(
+                            (acc, curr) => acc + curr.distance,
+                            0
+                          ) /
+                            getThisWeeksTrainings().reduce(
+                              (acc, curr) => acc + curr.distance,
+                              0
+                            )) *
+                            100
+                        )}
+                        %
+                      </CircularProgressLabel>
+                    </CircularProgress>
+                  </Box>
+                </Flex>
+              </Flex>
+
+              <Grid
+                templateColumns={{
+                  base: "1fr",
+                  md: "repeat(2, 1fr)",
+                  lg: "repeat(3, 1fr)",
+                }}
+                gap={6}
+              >
+                {getThisWeeksTrainings().map((event) => (
+                  <TrainingCard
+                    key={event.day + event.title + event.distance}
+                    event={event}
+                    formatMeterToKilometer={formatMeterToKilometer}
+                    convertToPace={convertToPace}
+                  />
+                ))}
+              </Grid>
+
+              {getThisWeeksActivities().length > 0 && (
+                <Box mt={8} pt={6} borderTop="1px" borderColor="gray.200">
+                  <Flex justify="space-between" align="center" mb={4}>
+                    <Box>
+                      <Text fontSize="md" fontWeight="medium" color="gray.700">
+                        Unmatched Runs This Week
+                      </Text>
+                      <Text fontSize="sm" color="gray.600">
+                        {getThisWeeksActivities().length} activities totaling{" "}
+                        {formatMeterToKilometer(
+                          getThisWeeksActivities().reduce(
+                            (acc, curr) => acc + curr.distance,
+                            0
+                          )
+                        )}
+                      </Text>
+                    </Box>
+                    <Text fontSize="sm" color="gray.500">
+                      These runs weren't matched to any training plan items
+                    </Text>
+                  </Flex>
+
+                  <Box>
+                    {getThisWeeksActivities().map((activity) => (
+                      <Flex
+                        key={activity.id}
+                        p={3}
+                        borderWidth="1px"
+                        borderRadius="md"
+                        mb={2}
+                        justify="space-between"
+                        align="center"
+                        _hover={{ bg: "gray.50" }}
+                      >
+                        <Box>
+                          <Text fontWeight="medium">{activity.name}</Text>
+                          <Text fontSize="sm" color="gray.600">
+                            {new Date(
+                              activity.start_date_local
+                            ).toLocaleDateString()}{" "}
+                            at{" "}
+                            {new Date(
+                              activity.start_date_local
+                            ).toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </Text>
+                        </Box>
+                        <Flex gap={4} align="center">
+                          <Text color="gray.700">
+                            {formatMeterToKilometer(activity.distance)}
+                          </Text>
+                          <Text color="gray.700">
+                            {formatDuration(activity.moving_time)}
+                          </Text>
+                          <Text color="gray.700">
+                            {metersPerSecondsToPace(activity.average_speed)} /km
+                          </Text>
+                        </Flex>
+                      </Flex>
+                    ))}
+                  </Box>
+                </Box>
+              )}
+            </Box>
+          ) : (
+            <>
+              <Heading as="h2" size="md" marginBottom={4}>
+                No active training plan
+              </Heading>
+              <Link href={getMailString()} color="blue.500">
+                Request one
+              </Link>
+            </>
+          )}
+
+          {showAnalytics && (
+            <Box textAlign="center" marginTop={8}>
+              <Heading as="h1" size="lg" marginBottom={4}>
+                Activity Analytics
+              </Heading>
+              {/* <ThresholdAnalysis
+                detailedActivities={detailedActivities}
+                onWeekSelect={filterActivites}
+              /> */}
+              <WeeklySummary activities={detailedActivities} />
+            </Box>
+          )}
+
+          {allowAnalytics && (
+            <Box marginTop={4} textAlign="center">
+              <Button
+                onClick={loadAnalytics}
+                colorScheme="teal"
+                marginBottom={2}
+                width="100%"
+                maxWidth="300px"
+              >
+                Load analytics
+              </Button>
+              {loadingAnalytics && (
+                <Flex justifyContent="center">
+                  <Spinner color="teal.500" marginTop={2} />
+                </Flex>
+              )}
+            </Box>
+          )}
+
+          {loadingActivities && (
+            <Flex justifyContent="center" marginY={4}>
+              <Spinner color="teal.500" />
+            </Flex>
+          )}
+
+          {filteredActivities && (
+            <Box textAlign="center" marginTop={4}>
+              <Button
+                onClick={() => setFilteredActivities(null)}
+                colorScheme="red"
+                width="100%"
+                maxWidth="300px"
+              >
+                Remove filter
+              </Button>
+            </Box>
+          )}
+        </Box>
       </div>
       {hideActivities && (
         <Box marginTop={4} textAlign="center">
@@ -922,170 +1173,176 @@ function Home() {
           </Button>
         </Box>
       )}
-      <div className="activity-div">
-        {!hideActivities &&
-          activities &&
-          athlete &&
-          activities.length &&
-          (filteredActivities ? filteredActivities : activities).map(
-            (activity) => (
-              <Activity
-                activity={activity}
-                loadSingleActivity={loadSingleActivity}
-                updateActivityOnStrava={updateActivityOnStrava}
-              />
-            )
-          )}
+      <Box maxWidth="1200px" margin="0 auto" px={6}>
+        <div className="activity-div">
+          {!hideActivities &&
+            activities &&
+            athlete &&
+            activities.length &&
+            (filteredActivities ? filteredActivities : activities).map(
+              (activity) => (
+                <Activity
+                  activity={activity}
+                  loadSingleActivity={loadSingleActivity}
+                  updateActivityOnStrava={updateActivityOnStrava}
+                />
+              )
+            )}
 
-        {showSingleActivity && activity && (
-          <div className="single-activity">
-            <p>{activity.name}</p>
-            <p>{activity.description}</p>
-            <div className="pace-analysis-container">
-              <PaceAnalysis laps={activity.laps} />
-            </div>
-            {/* a table that displays all laps of the activity */}
-            <table className="lap-table">
-              <thead>
-                <tr>
-                  <th>Select</th>
-                  <th>Lap</th>
-                  <th>Distance</th>
-                  <th>Time</th>
-                  <th>Avg. Heartrate</th>
-                </tr>
-              </thead>
-              <tbody>
-                {activity.laps.map((lap, index) => (
-                  <tr key={lap.id} className="lap-table-row">
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={selectedRows.includes(index)}
-                        onChange={() => handleRowSelection(index)}
-                      />
-                    </td>
-                    <td>{lap.name}</td>
-                    <td>
-                      <input
-                        type="text"
-                        value={
-                          index === editedIndex ? editedDistance : lap.distance
-                        }
-                        onChange={(e) =>
-                          handleDistanceChangeFromActivity(e, index)
-                        }
-                      />
-                    </td>
-                    <td>{convertToPace((lap.moving_time / 60).toFixed(2))}</td>
-                    <td>{lap.average_heartrate}</td>
+          {showSingleActivity && activity && (
+            <div className="single-activity">
+              <p>{activity.name}</p>
+              <p>{activity.description}</p>
+              <div className="pace-analysis-container">
+                <PaceAnalysis laps={activity.laps} />
+              </div>
+              {/* a table that displays all laps of the activity */}
+              <table className="lap-table">
+                <thead>
+                  <tr>
+                    <th>Select</th>
+                    <th>Lap</th>
+                    <th>Distance</th>
+                    <th>Time</th>
+                    <th>Avg. Heartrate</th>
                   </tr>
+                </thead>
+                <tbody>
+                  {activity.laps.map((lap, index) => (
+                    <tr key={lap.id} className="lap-table-row">
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={selectedRows.includes(index)}
+                          onChange={() => handleRowSelection(index)}
+                        />
+                      </td>
+                      <td>{lap.name}</td>
+                      <td>
+                        <input
+                          type="text"
+                          value={
+                            index === editedIndex
+                              ? editedDistance
+                              : lap.distance
+                          }
+                          onChange={(e) =>
+                            handleDistanceChangeFromActivity(e, index)
+                          }
+                        />
+                      </td>
+                      <td>
+                        {convertToPace((lap.moving_time / 60).toFixed(2))}
+                      </td>
+                      <td>{lap.average_heartrate}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+        {!showPaceCalculator && (
+          <Flex justifyContent="center" marginTop={4}>
+            <Button
+              onClick={() => {
+                setShowPaceCalculator(true);
+              }}
+              colorScheme="teal"
+              marginBottom={2}
+              width="100%"
+              maxWidth="300px"
+            >
+              Show Pace Calculator
+            </Button>
+          </Flex>
+        )}
+
+        {showPaceCalculator && (
+          <div>
+            <h1>Pace Calculator</h1>
+            <h2>Bislett Special</h2>
+            <div className="container">
+              <div id="inputs">
+                {distanceInputs.map((distance, index) => (
+                  <div className="input-container" key={index}>
+                    <label>Distance (in meters):</label>
+                    <input
+                      type="number"
+                      value={distance}
+                      onChange={(e) =>
+                        handleDistanceChange(index, e.target.value)
+                      }
+                      step="1"
+                    />
+                    <label>Time (in seconds):</label>
+                    <input
+                      type="number"
+                      value={timeInputs[index]}
+                      onChange={(e) => handleTimeChange(index, e.target.value)}
+                      step="1"
+                    />
+                  </div>
                 ))}
-              </tbody>
-            </table>
+              </div>
+
+              <Flex justifyContent="center" marginTop={4}>
+                <Button
+                  onClick={() => {
+                    addInput();
+                  }}
+                  colorScheme="teal"
+                  marginBottom={2}
+                  width="100%"
+                  maxWidth="300px"
+                >
+                  +
+                </Button>
+              </Flex>
+              <Flex justifyContent="center" marginTop={4}>
+                <Button
+                  onClick={() => {
+                    setSetDistance(0);
+                    setTimeout(() => {
+                      calculatePace();
+                    }, 500);
+                  }}
+                  colorScheme="teal"
+                  marginBottom={2}
+                  width="100%"
+                  maxWidth="300px"
+                >
+                  Calculate Pace
+                </Button>
+              </Flex>
+              <Flex justifyContent="center" marginTop={4}>
+                {/* Calculate for same distance for all */}
+                <Button
+                  onClick={() => {
+                    calculatePaceWithSetDistance();
+                  }}
+                  colorScheme="teal"
+                  marginBottom={2}
+                  width="100%"
+                  maxWidth="300px"
+                >
+                  Calculate with same distance for all laps
+                </Button>
+              </Flex>
+
+              <input
+                type="number"
+                value={setDistance}
+                onChange={(e) => setSetDistance(e.target.value)}
+              />
+
+              <div id="result" className="output-container">
+                {result}
+              </div>
+            </div>
           </div>
         )}
-      </div>
-      {!showPaceCalculator && (
-        <Flex justifyContent="center" marginTop={4}>
-          <Button
-            onClick={() => {
-              setShowPaceCalculator(true);
-            }}
-            colorScheme="teal"
-            marginBottom={2}
-            width="100%"
-            maxWidth="300px"
-          >
-            Show Pace Calculator
-          </Button>
-        </Flex>
-      )}
-
-      {showPaceCalculator && (
-        <div>
-          <h1>Pace Calculator</h1>
-          <h2>Bislett Special</h2>
-          <div className="container">
-            <div id="inputs">
-              {distanceInputs.map((distance, index) => (
-                <div className="input-container" key={index}>
-                  <label>Distance (in meters):</label>
-                  <input
-                    type="number"
-                    value={distance}
-                    onChange={(e) =>
-                      handleDistanceChange(index, e.target.value)
-                    }
-                    step="1"
-                  />
-                  <label>Time (in seconds):</label>
-                  <input
-                    type="number"
-                    value={timeInputs[index]}
-                    onChange={(e) => handleTimeChange(index, e.target.value)}
-                    step="1"
-                  />
-                </div>
-              ))}
-            </div>
-
-            <Flex justifyContent="center" marginTop={4}>
-              <Button
-                onClick={() => {
-                  addInput();
-                }}
-                colorScheme="teal"
-                marginBottom={2}
-                width="100%"
-                maxWidth="300px"
-              >
-                +
-              </Button>
-            </Flex>
-            <Flex justifyContent="center" marginTop={4}>
-              <Button
-                onClick={() => {
-                  setSetDistance(0);
-                  setTimeout(() => {
-                    calculatePace();
-                  }, 500);
-                }}
-                colorScheme="teal"
-                marginBottom={2}
-                width="100%"
-                maxWidth="300px"
-              >
-                Calculate Pace
-              </Button>
-            </Flex>
-            <Flex justifyContent="center" marginTop={4}>
-              {/* Calculate for same distance for all */}
-              <Button
-                onClick={() => {
-                  calculatePaceWithSetDistance();
-                }}
-                colorScheme="teal"
-                marginBottom={2}
-                width="100%"
-                maxWidth="300px"
-              >
-                Calculate with same distance for all laps
-              </Button>
-            </Flex>
-
-            <input
-              type="number"
-              value={setDistance}
-              onChange={(e) => setSetDistance(e.target.value)}
-            />
-
-            <div id="result" className="output-container">
-              {result}
-            </div>
-          </div>
-        </div>
-      )}
+      </Box>
     </div>
   );
 }
