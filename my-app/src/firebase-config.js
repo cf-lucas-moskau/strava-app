@@ -1,5 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getMessaging, getToken, onMessage } from "firebase/messaging";
+import { getDatabase, ref, set, get } from "firebase/database";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDPvsTvEV5Q_x24R9FTvk2PC32rrQ_bBHQ",
@@ -15,6 +16,32 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const messaging = getMessaging(app);
+const database = getDatabase(app);
+
+export const saveClaimedToken = async (athleteId, trainingId) => {
+  try {
+    await set(ref(database, `claimedTokens/${athleteId}/${trainingId}`), {
+      claimed: true,
+      timestamp: Date.now(),
+    });
+    return true;
+  } catch (error) {
+    console.error("Error saving claimed token:", error);
+    return false;
+  }
+};
+
+export const checkIfTokenClaimed = async (athleteId, trainingId) => {
+  try {
+    const snapshot = await get(
+      ref(database, `claimedTokens/${athleteId}/${trainingId}`)
+    );
+    return snapshot.exists();
+  } catch (error) {
+    console.error("Error checking claimed token:", error);
+    return false;
+  }
+};
 
 export const requestForToken = async () => {
   try {

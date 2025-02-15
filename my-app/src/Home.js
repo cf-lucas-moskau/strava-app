@@ -22,6 +22,7 @@ import {
   setupNotifications,
   showTestNotification,
 } from "./utils/notifications";
+import { saveClaimedToken, checkIfTokenClaimed } from "./firebase-config";
 
 import {
   Box,
@@ -46,12 +47,26 @@ import {
 import Activity from "./components/Activity";
 import TrainingCard from "./components/TrainingCard";
 import { RepeatIcon } from "@chakra-ui/icons";
+import {
+  achievementsList,
+  checkAchievements,
+  isSameDay,
+  isConsecutiveDay,
+  calculateWeeklyTotal,
+} from "./utils/achievements";
+import AchievementsDisplay from "./components/AchievementsDisplay";
+import { ref, get, getDatabase } from "firebase/database";
 
 function Home() {
   const navigate = useNavigate();
   const toast = useToast();
 
   const [mode, setMode] = useState(localStorage.getItem("mode")); // Default mode is 'Lucas'
+  const [tokens, setTokens] = useState(
+    parseInt(localStorage.getItem("tokens")) || 0
+  );
+  const [unclaimedTokens, setUnclaimedTokens] = useState({});
+  const [isCheckingTokens, setIsCheckingTokens] = useState(false);
 
   const [distanceInputs, setDistanceInputs] = useState([]);
   const [timeInputs, setTimeInputs] = useState([]);
@@ -82,11 +97,15 @@ function Home() {
   const [showAnalytics, setShowAnalytics] = useState(false);
 
   const [pullToRefreshDistance, setPullToRefreshDistance] = useState(0);
+  const [userAchievements, setUserAchievements] = useState({});
+
+  const [thisWeeksTrainingsCache, setThisWeeksTrainingsCache] = useState(null);
+  const [lastCacheUpdate, setLastCacheUpdate] = useState(null);
 
   const mongoApiKey =
     "xUxMs0pTBssX9ylmTyk0MorcQwcCUjQEP9vA4IgZdKVJIjNsNEYqugQUDFhkAUYH";
   const dataSource = "Cluster0";
-  const database = "development";
+  const database = getDatabase();
   const appId = "application-0-vtsodnl";
 
   const app = new Realm.App({ id: appId });
@@ -187,25 +206,13 @@ function Home() {
         title: "Easy run",
       },
       {
-        day: "2025-02-14",
+        day: "2025-02-13",
         distance: 11000,
         description: "Einfach nur entspannt laufen",
         title: "Easy run",
       },
       {
-        day: "2025-02-14",
-        distance: 11000,
-        description: "Einfach nur entspannt laufen",
-        title: "Easy run",
-      },
-      {
-        day: "2025-02-14",
-        distance: 11000,
-        description: "Einfach nur entspannt laufen",
-        title: "Easy run",
-      },
-      {
-        day: "2025-02-14",
+        day: "2025-02-12",
         distance: 11000,
         description: "Einfach nur entspannt laufen",
         title: "Easy run",
@@ -233,13 +240,13 @@ function Home() {
         title: "Sonntagslauf",
       },
       {
-        day: "2025-02-14",
+        day: "2025-02-13",
         distance: 3400,
         description: "mit Lucas",
         title: "Easy run",
       },
       {
-        day: "2025-02-14",
+        day: "2025-02-12",
         distance: 2500,
         description: "mit Lucas",
         title: "Coffee run",
@@ -449,13 +456,20 @@ function Home() {
         return;
       }
 
-      // If we have an access token but no athlete data, fetch it
+      // Only fetch athlete data if we don't have it stored
       if (storedAccessToken && !storedAthlete) {
         try {
-          await getAthlete(storedAccessToken);
+          const athleteUrl = "https://www.strava.com/api/v3/athlete";
+          const response = await axios.get(athleteUrl, {
+            headers: {
+              Authorization: `Bearer ${storedAccessToken}`,
+            },
+          });
+          const athleteData = response.data;
+          setAthlete(athleteData);
+          await saveAthlete(athleteData);
         } catch (error) {
           console.error("Error fetching athlete:", error);
-          // If we get a 401, the token is invalid
           if (error.response?.status === 401) {
             logout();
           }
@@ -571,21 +585,7 @@ function Home() {
       console.warn("WE DONT HAVE ACCESS TOKEN, ABORTING!");
       return;
     }
-    console.log("Fetching athlete data...");
-    const athleteUrl = "https://www.strava.com/api/v3/athlete";
-    const headers = {
-      Authorization: `Bearer ${accessToken || _accessToken}`,
-    };
-
-    try {
-      const response = await axios.get(athleteUrl, { headers });
-      console.log("Response from athlete endpoint:", response.data);
-      setAthlete(response.data);
-      // Save to IndexedDB
-      await saveAthlete(response.data);
-    } catch (error) {
-      console.error("Error fetching athlete data:", error);
-    }
+    return null;
   };
 
   const handleLogin = () => {
@@ -779,7 +779,99 @@ function Home() {
     localStorage.setItem("mode", mode === "Lucas" ? "Sophia" : "Lucas");
   };
 
+  const claimToken = async (trainingId) => {
+    if (!athlete) return;
+
+    const claimed = await saveClaimedToken(athlete.id, trainingId);
+    if (claimed) {
+      // Update token count
+      setTokens((prev) => {
+        const newTokens = prev + 1;
+        localStorage.setItem("tokens", newTokens.toString());
+        return newTokens;
+      });
+
+      // Remove from unclaimed tokens to hide the button
+      setUnclaimedTokens((prev) => {
+        const newUnclaimed = { ...prev };
+        delete newUnclaimed[trainingId];
+        return newUnclaimed;
+      });
+    }
+  };
+
+  useEffect(() => {
+    const checkClaimedTokens = async () => {
+      if (!athlete || !activities || isCheckingTokens) return;
+
+      setIsCheckingTokens(true);
+      const thisWeeksTrainings = trainingPlans[athlete.id]?.filter(
+        (training) => {
+          const trainingDate = new Date(training.day);
+          const today = new Date();
+          const monday = new Date(today);
+          monday.setDate(
+            today.getDate() - today.getDay() + (today.getDay() === 0 ? -6 : 1)
+          );
+          monday.setHours(0, 0, 0, 0);
+          const sunday = new Date(monday);
+          sunday.setDate(monday.getDate() + 6);
+          sunday.setHours(23, 59, 59, 999);
+          return trainingDate >= monday && trainingDate <= sunday;
+        }
+      );
+
+      if (!thisWeeksTrainings) {
+        setIsCheckingTokens(false);
+        return;
+      }
+
+      try {
+        // Count total claimed tokens for this athlete
+        const allClaimedTokensSnapshot = await get(
+          ref(database, `claimedTokens/${athlete.id}`)
+        );
+        const totalTokens = allClaimedTokensSnapshot.exists()
+          ? Object.keys(allClaimedTokensSnapshot.val()).length
+          : 0;
+        setTokens(totalTokens);
+
+        // Create a new object to store the updated unclaimed tokens
+        const newUnclaimedTokens = {};
+
+        // Check each training
+        for (const training of thisWeeksTrainings) {
+          const trainingId = `${training.day}-${training.title}-${training.distance}`;
+          const isClaimed = await checkIfTokenClaimed(athlete.id, trainingId);
+
+          // Only add to unclaimed tokens if it's completed but not claimed
+          if (training.completed && !isClaimed) {
+            newUnclaimedTokens[trainingId] = true;
+          }
+        }
+
+        // Update state with the new unclaimed tokens
+        setUnclaimedTokens(newUnclaimedTokens);
+      } catch (error) {
+        console.error("Error checking claimed tokens:", error);
+      } finally {
+        setIsCheckingTokens(false);
+      }
+    };
+
+    checkClaimedTokens();
+  }, [athlete?.id, activities]); // Only run when athlete ID or activities change
+
   const getThisWeeksTrainings = () => {
+    // Return cached result if it exists and is less than 1 minute old
+    if (
+      thisWeeksTrainingsCache &&
+      lastCacheUpdate &&
+      Date.now() - lastCacheUpdate < 60000
+    ) {
+      return thisWeeksTrainingsCache;
+    }
+
     if (!athlete || !athlete.id) {
       console.log("No athlete or athlete id");
       return [];
@@ -787,22 +879,14 @@ function Home() {
 
     // Get today's date
     const today = new Date();
-
-    // Get the day of the week (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
     const dayOfWeek = today.getDay();
-
-    // Calculate the difference to Monday (subtracting 1 from dayOfWeek, if it's Sunday it becomes -6)
     const diffToMonday = (dayOfWeek === 0 ? -6 : 1) - dayOfWeek;
-
-    // Calculate the start of the week (Monday)
     const monday = new Date(today);
     monday.setDate(today.getDate() + diffToMonday);
-    monday.setHours(0, 0, 0, 0); // Set time to start of day
-
-    // Calculate the end of the week (Sunday)
+    monday.setHours(0, 0, 0, 0);
     const sunday = new Date(monday);
     sunday.setDate(monday.getDate() + 6);
-    sunday.setHours(23, 59, 59, 999); // Set time to end of day
+    sunday.setHours(23, 59, 59, 999);
 
     // Filter the activities within the current week
     const thisWeeksTrainings = trainingPlans[athlete.id].filter((activity) => {
@@ -817,17 +901,13 @@ function Home() {
         return activityDate >= monday && activityDate <= sunday;
       }) || [];
 
-    // Create a copy of athletesActivities that we can modify
     let remainingActivities = [...athletesActivities];
 
-    // now I want to check if the activities are within 10% of the training distance
-    // if they are, I consider the training completed
     thisWeeksTrainings.forEach((training) => {
       const completed = remainingActivities.find((activity) => {
         const distanceDifference = Math.abs(
           training.distance - activity.distance
         );
-        // if there is also a time, check if the time is within 15% of the training time
         if (training.time) {
           const timeDifference = Math.abs(
             training.time - activity.moving_time / 60
@@ -836,23 +916,23 @@ function Home() {
             distanceDifference < training.distance * 0.15 &&
             timeDifference < training.time * 0.15
           );
-        } else {
-          return distanceDifference < training.distance * 0.15;
         }
+        return distanceDifference < training.distance * 0.15;
       });
 
       training.completed = !!completed;
       training.fullFilledTraining = completed;
 
       if (completed) {
-        // remove the activity from the remaining activities
         remainingActivities = remainingActivities.filter(
           (activity) => activity.id !== completed.id
         );
       }
     });
 
-    // Store the remaining unmatched activities
+    // Cache the results
+    setThisWeeksTrainingsCache(thisWeeksTrainings);
+    setLastCacheUpdate(Date.now());
     window.unmatchedActivities = remainingActivities;
 
     return thisWeeksTrainings;
@@ -956,6 +1036,73 @@ function Home() {
     }
   }, [athlete]);
 
+  useEffect(() => {
+    if (activities && athlete && !loadingActivities) {
+      // Calculate achievements
+      const progress = calculateAchievementProgress(activities);
+      setUserAchievements(progress);
+    }
+  }, [activities?.length, athlete?.id, loadingActivities]); // Only recalculate when activities length or athlete ID changes
+
+  const calculateCurrentStreak = () => {
+    if (!activities) return 0;
+    let streak = 0;
+    const sortedActivities = [...activities].sort(
+      (a, b) => new Date(b.start_date_local) - new Date(a.start_date_local)
+    );
+
+    let currentDate = new Date();
+    for (let activity of sortedActivities) {
+      const activityDate = new Date(activity.start_date_local);
+      if (isSameDay(currentDate, activityDate)) {
+        streak++;
+        currentDate.setDate(currentDate.getDate() - 1);
+      } else if (isConsecutiveDay(currentDate, activityDate)) {
+        streak++;
+        currentDate = activityDate;
+      } else {
+        break;
+      }
+    }
+    return streak;
+  };
+
+  const calculateAchievementProgress = (activities) => {
+    const progress = {};
+
+    // Calculate progress for each achievement
+    Object.values(achievementsList)
+      .flat()
+      .forEach((achievement) => {
+        if (achievement.type === "single_run") {
+          const bestRun = Math.max(...activities.map((a) => a.distance));
+          progress[achievement.id] = (bestRun / achievement.requirement) * 100;
+        } else if (achievement.type === "weekly_total") {
+          const weeklyTotal = calculateWeeklyTotal(activities);
+          progress[achievement.id] =
+            (weeklyTotal / achievement.requirement) * 100;
+        } else if (achievement.type === "streak") {
+          const currentStreak = calculateCurrentStreak();
+          progress[achievement.id] =
+            (currentStreak / achievement.requirement) * 100;
+        } else if (achievement.type === "average_pace") {
+          // Find the best (lowest) pace among all activities
+          const bestPace = Math.min(
+            ...activities
+              .filter((a) => a.average_speed) // Filter out activities without speed data
+              .map((a) => 1000 / a.average_speed) // Convert to seconds per kilometer
+          );
+          // If we have a valid pace and it's better (lower) than the requirement, set progress to 100%
+          progress[achievement.id] =
+            bestPace <= achievement.requirement
+              ? 100
+              : (achievement.requirement / bestPace) * 100;
+        }
+      });
+
+    return progress;
+  };
+
   return (
     <div>
       {/* Loading overlay */}
@@ -995,7 +1142,12 @@ function Home() {
       )}
 
       <div>
-        <Header handleLogin={handleLogin} athlete={athlete} logout={logout} />
+        <Header
+          handleLogin={handleLogin}
+          athlete={athlete}
+          logout={logout}
+          tokens={tokens}
+        />
 
         {/* Add reload button */}
         {athlete && (
@@ -1011,19 +1163,6 @@ function Home() {
                 leftIcon={<RepeatIcon />}
               >
                 Refresh Activities
-              </Button>
-              <Button
-                onClick={() =>
-                  showTestNotification("Training Reminder", {
-                    body: "Don't forget your scheduled run today!",
-                    data: { url: window.location.origin },
-                  })
-                }
-                colorScheme="purple"
-                size="md"
-                flex="1"
-              >
-                Test Notification
               </Button>
             </Flex>
           </Box>
@@ -1044,13 +1183,6 @@ function Home() {
                   <Heading as="h2" size="lg" mb={2}>
                     This Week's Training
                   </Heading>
-                  <Text color="gray.600">
-                    Your training plan for{" "}
-                    {new Date().toLocaleDateString("en-US", {
-                      month: "long",
-                      year: "numeric",
-                    })}
-                  </Text>
                 </Box>
                 <Flex align="center" gap={8}>
                   <Box textAlign="right">
@@ -1117,14 +1249,22 @@ function Home() {
                 }}
                 gap={6}
               >
-                {getThisWeeksTrainings().map((event) => (
-                  <TrainingCard
-                    key={event.day + event.title + event.distance}
-                    event={event}
-                    formatMeterToKilometer={formatMeterToKilometer}
-                    convertToPace={convertToPace}
-                  />
-                ))}
+                {getThisWeeksTrainings().map((event) => {
+                  const trainingId = `${event.day}-${event.title}-${event.distance}`;
+                  const canClaim = unclaimedTokens[trainingId];
+                  return (
+                    <TrainingCard
+                      key={`${trainingId}-${
+                        canClaim ? "unclaimed" : "claimed"
+                      }`}
+                      event={event}
+                      formatMeterToKilometer={formatMeterToKilometer}
+                      convertToPace={convertToPace}
+                      onClaimToken={() => claimToken(trainingId)}
+                      canClaim={canClaim}
+                    />
+                  );
+                })}
               </Grid>
 
               {getThisWeeksActivities().length > 0 && (
@@ -1204,6 +1344,19 @@ function Home() {
             </>
           )}
 
+          {/* Gamification Section */}
+          {athlete && (
+            <>
+              <Box mt={8} pt={6} borderTop="1px" borderColor="gray.200">
+                <AchievementsDisplay
+                  achievements={achievementsList}
+                  userProgress={userAchievements}
+                />
+              </Box>
+            </>
+          )}
+
+          {/* Analytics Section */}
           {showAnalytics && (
             <Box textAlign="center" marginTop={8}>
               <Heading as="h1" size="lg" marginBottom={4}>
@@ -1240,19 +1393,6 @@ function Home() {
             <Flex justifyContent="center" marginY={4}>
               <Spinner color="teal.500" />
             </Flex>
-          )}
-
-          {filteredActivities && (
-            <Box textAlign="center" marginTop={4}>
-              <Button
-                onClick={() => setFilteredActivities(null)}
-                colorScheme="red"
-                width="100%"
-                maxWidth="300px"
-              >
-                Remove filter
-              </Button>
-            </Box>
           )}
         </Box>
       </div>

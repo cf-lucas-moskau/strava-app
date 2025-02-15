@@ -8,10 +8,24 @@ import {
   Flex,
   Badge,
   Icon,
+  Button,
+  keyframes,
 } from "@chakra-ui/react";
-import { CheckIcon, TimeIcon, CloseIcon } from "@chakra-ui/icons";
+import { CheckIcon, TimeIcon, CloseIcon, StarIcon } from "@chakra-ui/icons";
 
-const TrainingCard = ({ event, formatMeterToKilometer, convertToPace }) => {
+const glowAnimation = keyframes`
+  0% { box-shadow: 0 0 5px #FFD700; }
+  50% { box-shadow: 0 0 20px #FFD700; }
+  100% { box-shadow: 0 0 5px #FFD700; }
+`;
+
+const TrainingCard = ({
+  event,
+  formatMeterToKilometer,
+  convertToPace,
+  onClaimToken,
+  canClaim,
+}) => {
   const isCompleted = event.completed;
 
   return (
@@ -69,13 +83,36 @@ const TrainingCard = ({ event, formatMeterToKilometer, convertToPace }) => {
 
       {event.fullFilledTraining && (
         <Box mt={4} pt={4} borderTop="1px" borderColor="gray.100">
-          <Text fontSize="sm" color="gray.600">
+          <Text fontSize="sm" color="gray.600" mb={canClaim ? 4 : 0}>
             Completed{" "}
             {formatMeterToKilometer(event.fullFilledTraining.distance)} on{" "}
             {new Date(
               event.fullFilledTraining.start_date_local
             ).toLocaleDateString()}
           </Text>
+          {canClaim ? (
+            <Flex justify="center">
+              <Button
+                onClick={onClaimToken}
+                colorScheme="yellow"
+                size="sm"
+                px={4}
+                leftIcon={<StarIcon boxSize={3} />}
+                animation={`${glowAnimation} 2s infinite`}
+              >
+                Claim Token
+              </Button>
+            </Flex>
+          ) : (
+            <Flex justify="center">
+              <Badge colorScheme="green" p={2} borderRadius="md">
+                <Flex align="center" gap={2}>
+                  <CheckIcon />
+                  Token Claimed
+                </Flex>
+              </Badge>
+            </Flex>
+          )}
         </Box>
       )}
     </Box>

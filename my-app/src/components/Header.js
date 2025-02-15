@@ -12,15 +12,29 @@ import {
   Text,
   Avatar,
   useToast,
+  keyframes,
 } from "@chakra-ui/react";
 import { Link } from "react-router-dom";
-import { ChevronDownIcon, DownloadIcon } from "@chakra-ui/icons";
+import { ChevronDownIcon, DownloadIcon, StarIcon } from "@chakra-ui/icons";
 
-const Header = ({ handleLogin, athlete, logout }) => {
+const popAnimation = keyframes`
+  0% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+`;
+
+const Header = ({ handleLogin, athlete, logout, tokens = 0 }) => {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [isTokenAnimating, setIsTokenAnimating] = useState(false);
   const toast = useToast();
   const url = window.location.href;
   const isPaceCalculator = url.includes("pace-calculator");
+
+  useEffect(() => {
+    setIsTokenAnimating(true);
+    const timer = setTimeout(() => setIsTokenAnimating(false), 500);
+    return () => clearTimeout(timer);
+  }, [tokens]);
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (e) => {
@@ -103,16 +117,26 @@ const Header = ({ handleLogin, athlete, logout }) => {
         {/* Right Side - Buttons */}
         {!isPaceCalculator && (
           <Flex align="center" gap={6}>
-            <Button
-              as={Link}
-              to="/pace-calculator"
-              colorScheme="teal"
-              size="md"
-              px={6}
-              width="200px"
-            >
-              Pace Calculator
-            </Button>
+            {athlete && (
+              <Flex
+                align="center"
+                gap={2}
+                bg="yellow.100"
+                px={3}
+                py={2}
+                borderRadius="full"
+                animation={
+                  isTokenAnimating
+                    ? `${popAnimation} 0.5s ease-in-out`
+                    : undefined
+                }
+              >
+                <StarIcon color="yellow.500" />
+                <Text fontWeight="bold" color="yellow.700">
+                  {tokens}
+                </Text>
+              </Flex>
+            )}
 
             {deferredPrompt && (
               <Button
