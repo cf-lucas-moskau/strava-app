@@ -52,6 +52,17 @@ messaging.onBackgroundMessage((payload) => {
   self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
+// Send message to clients about update
+const sendMessageToClients = async (message) => {
+  const clients = await self.clients.matchAll();
+  clients.forEach((client) => {
+    client.postMessage({
+      type: "APP_UPDATE",
+      message,
+    });
+  });
+};
+
 // Install a service worker
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -60,6 +71,8 @@ self.addEventListener("install", (event) => {
       return cache.addAll(urlsToCache);
     })
   );
+  // Optionally force activation
+  self.skipWaiting();
 });
 
 // Listen for push notifications
@@ -123,18 +136,24 @@ self.addEventListener("fetch", (event) => {
   );
 });
 
-// Update a service worker
+// Activate the service worker
 self.addEventListener("activate", (event) => {
-  const cacheWhitelist = [CACHE_NAME];
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheWhitelist.indexOf(cacheName) === -1) {
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    })
+    Promise.all([
+      // Clean old caches
+      caches.keys().then((cacheNames) => {
+        return Promise.all(
+          cacheNames.map((cacheName) => {
+            if (cacheName !== CACHE_NAME) {
+              return caches.delete(cacheName);
+            }
+          })
+        );
+      }),
+      // Notify clients about the update
+      sendMessageToClients("App updated to latest version!"),
+      // Take control of all clients
+      self.clients.claim(),
+    ])
   );
 });
