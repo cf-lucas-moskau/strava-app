@@ -11,6 +11,13 @@ import * as Realm from "realm-web";
 import { EditIcon } from "@chakra-ui/icons";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@chakra-ui/react";
+import {
+  saveActivities,
+  getActivities,
+  saveAthlete,
+  getAthlete,
+  clearData,
+} from "./utils/db";
 
 import {
   Box,
@@ -223,7 +230,7 @@ function Home() {
       },
       {
         day: "2025-02-14",
-        distance: 3000,
+        distance: 3400,
         description: "mit Lucas",
         title: "Easy run",
       },
@@ -232,6 +239,24 @@ function Home() {
         distance: 2500,
         description: "mit Lucas",
         title: "Coffee run",
+      },
+      {
+        day: "2025-02-17",
+        distance: 3000,
+        description: "mit Lucas",
+        title: "Coffee run",
+      },
+      {
+        day: "2025-02-17",
+        distance: 4000,
+        description: "mit Lucas",
+        title: "Easy run",
+      },
+      {
+        day: "2025-02-17",
+        distance: 5000,
+        description: "",
+        title: "Long run",
       },
     ],
   };
@@ -370,7 +395,8 @@ function Home() {
 
       const activities = response.data;
       setActivities(activities);
-      localStorage.setItem("activities", JSON.stringify(activities));
+      // Save to IndexedDB
+      await saveActivities(activities);
       return activities;
     } catch (error) {
       console.error("Error fetching activities:", error);
@@ -389,14 +415,29 @@ function Home() {
   };
 
   useEffect(() => {
-    handleAuthorizationCallback();
-    populateActivitiesFromStorage();
-    const storedAccessToken = localStorage.getItem("accessToken");
-    if (storedAccessToken) {
-      console.log("Already have Access token:", storedAccessToken);
-      setAccessToken(storedAccessToken);
-      getAthlete(storedAccessToken);
-    }
+    const init = async () => {
+      // Try to load data from IndexedDB first
+      const storedAthlete = await getAthlete();
+      const storedActivities = await getActivities();
+
+      if (storedAthlete) {
+        setAthlete(storedAthlete);
+      }
+      if (storedActivities.length > 0) {
+        setActivities(storedActivities);
+      }
+
+      // Then try to handle authorization and fetch fresh data
+      handleAuthorizationCallback();
+      const storedAccessToken = localStorage.getItem("accessToken");
+      if (storedAccessToken) {
+        console.log("Already have Access token:", storedAccessToken);
+        setAccessToken(storedAccessToken);
+        getAthlete(storedAccessToken);
+      }
+    };
+
+    init();
   }, []);
 
   // Add new useEffect to fetch activities when athlete is populated
@@ -408,24 +449,7 @@ function Home() {
   }, [athlete, accessToken]);
 
   const loadSingleActivity = async (activityId) => {
-    try {
-      const response = await axios.get(
-        `https://www.strava.com/api/v3/activities/${activityId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        }
-      );
-
-      const activity = response.data;
-      console.log("Activity:", activity);
-      setHideActivities(true);
-      setShowSingleActivity(true);
-      setActivity(activity);
-    } catch (error) {
-      console.error("Error fetching activity:", error);
-    }
+    navigate(`/run/${activityId}`);
   };
 
   const getActivitesFromDB = async () => {
@@ -514,6 +538,8 @@ function Home() {
       const response = await axios.get(athleteUrl, { headers });
       console.log("Response from athlete endpoint:", response.data);
       setAthlete(response.data);
+      // Save to IndexedDB
+      await saveAthlete(response.data);
     } catch (error) {
       console.error("Error fetching athlete data:", error);
     }
@@ -696,10 +722,12 @@ function Home() {
     return `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
   };
 
-  const logout = () => {
+  const logout = async () => {
     setAthlete(null);
     setAccessToken("");
     localStorage.removeItem("accessToken");
+    // Clear offline data
+    await clearData();
   };
 
   const toggleMode = () => {
