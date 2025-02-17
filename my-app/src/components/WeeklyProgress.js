@@ -8,6 +8,9 @@ import {
   CircularProgress,
   CircularProgressLabel,
   Spinner,
+  Stack,
+  IconButton,
+  useBreakpointValue,
 } from "@chakra-ui/react";
 import { ChevronLeftIcon, ChevronRightIcon } from "@chakra-ui/icons";
 import { formatMeterToKilometer } from "../utils/formatters";
@@ -25,6 +28,13 @@ const WeeklyProgress = ({
 }) => {
   const [weeklyTrainings, setWeeklyTrainings] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Responsive values
+  const isMobile = useBreakpointValue({ base: true, md: false });
+  const progressSize = useBreakpointValue({ base: "80px", md: "100px" });
+  const headingSize = useBreakpointValue({ base: "md", md: "lg" });
+  const stackDirection = useBreakpointValue({ base: "column", md: "row" });
+  const contentSpacing = useBreakpointValue({ base: 4, md: 8 });
 
   useEffect(() => {
     const fetchTrainings = async () => {
@@ -48,26 +58,42 @@ const WeeklyProgress = ({
 
   if (loading) {
     return (
-      <Flex justify="center" align="center" py={8}>
+      <Flex justify="center" align="center" py={6}>
         <Spinner size="xl" color="teal.500" />
       </Flex>
     );
   }
 
-  return (
-    <Flex
-      justify="space-between"
-      align="center"
-      mb={6}
-      borderBottom="1px"
-      borderColor="gray.200"
-      pb={4}
-    >
-      <Box>
-        <Heading as="h2" size="lg" mb={2}>
-          {getWeekLabel(weekOffset)}
-        </Heading>
-        <Flex gap={4}>
+  const NavigationButtons = () => (
+    <Flex gap={2} justify={isMobile ? "center" : "flex-start"}>
+      {isMobile ? (
+        <>
+          <IconButton
+            icon={<ChevronLeftIcon />}
+            onClick={() => setWeekOffset((prev) => prev - 1)}
+            variant="ghost"
+            aria-label="Previous Week"
+            size="sm"
+          />
+          {weekOffset !== 0 && (
+            <IconButton
+              icon="•"
+              onClick={() => setWeekOffset(0)}
+              variant="ghost"
+              aria-label="Current Week"
+              size="sm"
+            />
+          )}
+          <IconButton
+            icon={<ChevronRightIcon />}
+            onClick={() => setWeekOffset((prev) => prev + 1)}
+            variant="ghost"
+            aria-label="Next Week"
+            size="sm"
+          />
+        </>
+      ) : (
+        <>
           <Button
             size="sm"
             onClick={() => setWeekOffset((prev) => prev - 1)}
@@ -89,58 +115,78 @@ const WeeklyProgress = ({
           >
             Next Week
           </Button>
-        </Flex>
+        </>
+      )}
+    </Flex>
+  );
+
+  const currentDistance = getAllThisWeeksActivities(
+    activities,
+    weekOffset
+  ).reduce((acc, curr) => acc + curr.distance, 0);
+  const targetDistance = weeklyTrainings.reduce(
+    (acc, curr) => acc + curr.distance,
+    0
+  );
+  const progressPercentage = (currentDistance / targetDistance) * 100 || 0;
+
+  return (
+    <Stack
+      direction={stackDirection}
+      spacing={contentSpacing}
+      mb={6}
+      borderBottom="1px"
+      borderColor="gray.200"
+      pb={4}
+      width="100%"
+      align={isMobile ? "center" : "flex-start"}
+    >
+      <Box flex="1" width={isMobile ? "100%" : "auto"}>
+        <Heading
+          as="h2"
+          size={headingSize}
+          mb={2}
+          textAlign={isMobile ? "center" : "left"}
+        >
+          {getWeekLabel(weekOffset)}
+        </Heading>
+        <NavigationButtons />
       </Box>
-      <Flex align="center" gap={8}>
-        <Box textAlign="right">
-          <Text fontSize="lg" fontWeight="bold" color="gray.700">
+
+      <Stack
+        direction={isMobile ? "row" : "row"}
+        align="center"
+        spacing={contentSpacing}
+        width={isMobile ? "100%" : "auto"}
+        justify={isMobile ? "space-between" : "flex-end"}
+      >
+        <Box textAlign={isMobile ? "left" : "right"}>
+          <Text
+            fontSize={isMobile ? "md" : "lg"}
+            fontWeight="bold"
+            color="gray.700"
+          >
             Weekly Progress
           </Text>
           <Text fontSize="sm" color="gray.600">
-            {formatMeterToKilometer(
-              getAllThisWeeksActivities(activities, weekOffset).reduce(
-                (acc, curr) => acc + curr.distance,
-                0
-              )
-            )}{" "}
-            of{" "}
-            {formatMeterToKilometer(
-              weeklyTrainings.reduce((acc, curr) => acc + curr.distance, 0)
-            )}
+            {formatMeterToKilometer(currentDistance)} of{" "}
+            {formatMeterToKilometer(targetDistance)}
           </Text>
         </Box>
-        <Box position="relative" width="100px" height="100px">
+        <Box position="relative" width={progressSize} height={progressSize}>
           <CircularProgress
-            value={
-              (getAllThisWeeksActivities(activities, weekOffset).reduce(
-                (acc, curr) => acc + curr.distance,
-                0
-              ) /
-                weeklyTrainings.reduce((acc, curr) => acc + curr.distance, 0)) *
-                100 || 0
-            }
+            value={progressPercentage}
             color="teal.400"
-            size="100px"
+            size={progressSize}
             thickness="8px"
           >
             <CircularProgressLabel>
-              {Math.round(
-                (getAllThisWeeksActivities(activities, weekOffset).reduce(
-                  (acc, curr) => acc + curr.distance,
-                  0
-                ) /
-                  weeklyTrainings.reduce(
-                    (acc, curr) => acc + curr.distance,
-                    0
-                  )) *
-                  100 || 0
-              )}
-              %
+              {Math.round(progressPercentage)}%
             </CircularProgressLabel>
           </CircularProgress>
         </Box>
-      </Flex>
-    </Flex>
+      </Stack>
+    </Stack>
   );
 };
 

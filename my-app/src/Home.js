@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import "./App.css";
 import { useNavigate } from "react-router-dom";
-import { useToast } from "@chakra-ui/react";
+import { useToast, useBreakpointValue } from "@chakra-ui/react";
 import {
   getActivities,
   saveAthlete,
@@ -30,6 +30,16 @@ import AdminPage from "./components/AdminPage";
 
 function Home({ admin }) {
   const navigate = useNavigate();
+  const toast = useToast();
+
+  // Move all breakpoint values to the top level
+  const containerPadding = useBreakpointValue({ base: 3, md: 6 });
+  const containerMaxWidth = useBreakpointValue({ base: "100%", md: "1200px" });
+  const buttonSize = useBreakpointValue({ base: "sm", md: "md" });
+  const buttonText = useBreakpointValue({
+    base: "Refresh",
+    md: "Refresh Activities",
+  });
 
   const [tokens, setTokens] = useState(
     parseInt(localStorage.getItem("tokens")) || 0
@@ -48,8 +58,6 @@ function Home({ admin }) {
 
   const [hasTrainingPlanState, setHasTrainingPlanState] = useState(false);
   const [checkingTrainingPlan, setCheckingTrainingPlan] = useState(true);
-
-  const toast = useToast();
 
   // Initialize app data
   useEffect(() => {
@@ -287,10 +295,11 @@ function Home({ admin }) {
                 >
                   <Box
                     bg="white"
-                    p={6}
+                    p={4}
                     borderRadius="lg"
                     boxShadow="xl"
                     textAlign="center"
+                    mx={3}
                   >
                     <Spinner
                       size="xl"
@@ -306,24 +315,33 @@ function Home({ admin }) {
                 </Box>
               )}
 
-              {/* Add Refresh Activities button */}
-              <Box maxWidth="1200px" margin="0 auto" px={6} py={4}>
+              {/* Refresh Activities button */}
+              <Box
+                maxWidth={containerMaxWidth}
+                margin="0 auto"
+                px={containerPadding}
+                py={3}
+              >
                 <Flex gap={4}>
                   <Button
                     onClick={fetchActivitiesWithDebounce}
                     colorScheme="teal"
-                    size="md"
+                    size={buttonSize}
                     flex="1"
                     isLoading={loadingActivities}
-                    loadingText="Refreshing activities..."
+                    loadingText="Refreshing..."
                     leftIcon={<RepeatIcon />}
                   >
-                    Refresh Activities
+                    {buttonText}
                   </Button>
                 </Flex>
               </Box>
 
-              <Box maxWidth="1200px" margin="0 auto" px={6}>
+              <Box
+                maxWidth={containerMaxWidth}
+                margin="0 auto"
+                px={containerPadding}
+              >
                 {athlete && athlete.id && hasTrainingPlanState ? (
                   <Box>
                     <WeeklyProgress
@@ -334,20 +352,22 @@ function Home({ admin }) {
                       getWeekLabel={getWeekLabel}
                     />
 
-                    <WeeklyTrainingGrid
-                      athlete={athlete}
-                      activities={activities}
-                      weekOffset={weekOffset}
-                      unclaimedTokens={unclaimedTokens}
-                      onClaimToken={(training, matchedActivity) =>
-                        claimToken(
-                          athlete,
-                          matchedActivity,
-                          setTokens,
-                          setUnclaimedTokens
-                        )
-                      }
-                    />
+                    <Box overflow="hidden" width="100%">
+                      <WeeklyTrainingGrid
+                        athlete={athlete}
+                        activities={activities}
+                        weekOffset={weekOffset}
+                        unclaimedTokens={unclaimedTokens}
+                        onClaimToken={(training, matchedActivity) =>
+                          claimToken(
+                            athlete,
+                            matchedActivity,
+                            setTokens,
+                            setUnclaimedTokens
+                          )
+                        }
+                      />
+                    </Box>
 
                     <UnmatchedRuns
                       athlete={athlete}
@@ -357,23 +377,29 @@ function Home({ admin }) {
                     />
                   </Box>
                 ) : athlete && athlete.id ? (
-                  <RequestTrainingPlan athlete={athlete} />
+                  <Box px={2}>
+                    <RequestTrainingPlan athlete={athlete} />
+                  </Box>
                 ) : null}
 
                 {/* Gamification Section */}
                 {athlete && (
-                  <>
-                    <Box mt={8} pt={6} borderTop="1px" borderColor="gray.200">
-                      <AchievementsDisplay
-                        achievements={achievementsList}
-                        userProgress={userAchievements}
-                      />
-                    </Box>
-                  </>
+                  <Box
+                    mt={6}
+                    pt={4}
+                    borderTop="1px"
+                    borderColor="gray.200"
+                    overflow="hidden"
+                  >
+                    <AchievementsDisplay
+                      achievements={achievementsList}
+                      userProgress={userAchievements}
+                    />
+                  </Box>
                 )}
 
                 {loadingActivities && (
-                  <Flex justifyContent="center" marginY={4}>
+                  <Flex justifyContent="center" my={4}>
                     <Spinner color="teal.500" />
                   </Flex>
                 )}
@@ -381,11 +407,15 @@ function Home({ admin }) {
             </>
           )}
 
-          <Box maxWidth="1200px" margin="0 auto" px={6}>
+          <Box
+            maxWidth={containerMaxWidth}
+            margin="0 auto"
+            px={containerPadding}
+          >
             <div className="activity-div">
               {activities &&
                 athlete &&
-                activities.length &&
+                activities.length > 0 &&
                 activities
                   .sort(
                     (a, b) =>

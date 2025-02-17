@@ -1,182 +1,147 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   Box,
   Flex,
   Stack,
   Text,
   Heading,
-  IconButton,
-  Input,
-  Textarea,
-  Button,
+  useBreakpointValue,
+  VStack,
+  HStack,
+  Divider,
 } from "@chakra-ui/react";
-import { EditIcon } from "@chakra-ui/icons";
 import RoutePreview from "./RoutePreview";
+import {
+  formatMeterToKilometer,
+  formatPace,
+  formatDuration,
+} from "../utils/formatters";
 
-function Activity({ activity, loadSingleActivity, updateActivityOnStrava }) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [title, setTitle] = useState(activity.name);
-  const [description, setDescription] = useState(activity.description);
+function Activity({ activity, loadSingleActivity }) {
+  // Responsive values
+  const isMobile = useBreakpointValue({ base: true, md: false });
+  const routePreviewSize = useBreakpointValue({
+    base: "150px",
+    sm: "180px",
+    md: "200px",
+  });
+  const headingSize = useBreakpointValue({ base: "sm", md: "md" });
+  const stackSpacing = useBreakpointValue({ base: 2, md: 4 });
+  const contentPadding = useBreakpointValue({ base: 3, md: 4 });
 
-  const handleEditClick = () => {
-    setIsEditing(!isEditing);
-  };
-
-  const handleSaveClick = () => {
-    updateActivityOnStrava(activity.id, {
-      title,
-      description,
-    });
-    setIsEditing(false);
-  };
-
-  const handleCancelClick = () => {
-    setTitle(activity.name);
-    setDescription(activity.description);
-    setIsEditing(false);
-  };
+  const ActivityStats = () => (
+    <Stack
+      direction={isMobile ? "column" : "row"}
+      spacing={stackSpacing}
+      width="100%"
+      justify={isMobile ? "flex-start" : "space-between"}
+      divider={isMobile ? <Divider /> : null}
+      py={2}
+    >
+      <HStack spacing={2}>
+        <Text fontWeight="medium" color="gray.700" minWidth="70px">
+          Distance:
+        </Text>
+        <Text>{formatMeterToKilometer(activity.distance)}</Text>
+      </HStack>
+      <HStack spacing={2}>
+        <Text fontWeight="medium" color="gray.700" minWidth="70px">
+          Pace:
+        </Text>
+        <Text>{formatPace(activity.average_speed)} /km</Text>
+      </HStack>
+      <HStack spacing={2}>
+        <Text fontWeight="medium" color="gray.700" minWidth="70px">
+          Time:
+        </Text>
+        <Text>{formatDuration(activity.elapsed_time)}</Text>
+      </HStack>
+    </Stack>
+  );
 
   return (
     <Box
-      key={activity.id}
       borderWidth="1px"
       borderRadius="md"
       boxShadow="md"
       overflow="hidden"
-      padding={4}
+      padding={contentPadding}
       marginBottom={6}
       bg="white"
       _hover={{ boxShadow: "lg" }}
       transition="all 0.2s"
     >
-      <Flex gap={6}>
-        {/* Left side: Route preview */}
-        <Box width="200px" flexShrink={0}>
+      <Stack
+        direction={isMobile ? "column" : "row"}
+        spacing={stackSpacing}
+        width="100%"
+      >
+        {/* Route preview */}
+        <Box width={isMobile ? "100%" : routePreviewSize} flexShrink={0}>
           <RoutePreview
             summaryPolyline={activity.map.summary_polyline}
-            height="200px"
+            height={routePreviewSize}
             type={activity.type}
           />
         </Box>
 
-        {/* Right side: Activity details */}
-        <Box flex="1">
-          <Flex justifyContent="space-between" marginBottom={4}>
-            <Stack spacing={1}>
+        {/* Activity details */}
+        <Stack flex="1" spacing={3}>
+          <Flex
+            justify="space-between"
+            align={isMobile ? "flex-start" : "center"}
+            direction={isMobile ? "column" : "row"}
+            gap={2}
+          >
+            {/* Date and Location */}
+            <VStack align={isMobile ? "flex-start" : "flex-start"} spacing={1}>
               <Text fontSize="sm" color="gray.600">
                 {new Date(activity.start_date_local).toLocaleString()}
               </Text>
-              <Text fontSize="sm" color="gray.600">
-                {activity.location_city ||
-                  activity.location_state ||
-                  activity.location_country}
-              </Text>
-            </Stack>
+              {(activity.location_city ||
+                activity.location_state ||
+                activity.location_country) && (
+                <Text fontSize="sm" color="gray.600">
+                  {activity.location_city ||
+                    activity.location_state ||
+                    activity.location_country}
+                </Text>
+              )}
+            </VStack>
 
-            <Stack spacing={1} textAlign="right">
-              {isEditing ? (
-                <>
-                  <Input
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    size="sm"
-                  />
-                  <Textarea
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    size="sm"
-                    mt={2}
-                  />
-                  <Button
-                    colorScheme="teal"
-                    size="sm"
-                    onClick={handleSaveClick}
-                    mt={2}
-                  >
-                    Save
-                  </Button>
-                  <Button size="sm" onClick={handleCancelClick} mt={2}>
-                    Cancel
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Heading
-                    as="h3"
-                    size="md"
-                    cursor="pointer"
-                    onClick={() => loadSingleActivity(activity.id)}
-                    _hover={{ color: "teal.500" }}
-                  >
-                    {title}
-                  </Heading>
+            {/* Title and Description */}
+            <Stack
+              spacing={2}
+              flex="1"
+              align={isMobile ? "flex-start" : "flex-end"}
+              width={isMobile ? "100%" : "auto"}
+            >
+              <Stack spacing={1} width="100%">
+                <Heading
+                  as="h3"
+                  size={headingSize}
+                  cursor="pointer"
+                  onClick={() => loadSingleActivity(activity.id)}
+                  _hover={{ color: "teal.500" }}
+                >
+                  {activity.name}
+                </Heading>
+                {activity.description && (
                   <Text fontSize="sm" color="gray.500">
-                    {description}
+                    {activity.description}
                   </Text>
-                </>
-              )}
-              {!isEditing && (
-                <IconButton
-                  aria-label="Edit Activity"
-                  icon={<EditIcon />}
-                  size="sm"
-                  onClick={handleEditClick}
-                  variant="ghost"
-                  colorScheme="teal"
-                />
-              )}
+                )}
+              </Stack>
             </Stack>
           </Flex>
 
-          <Box borderTopWidth="1px" borderColor="gray.200" pt={4}>
-            <Flex justifyContent="space-between">
-              <Text>
-                <Text as="span" fontWeight="medium" color="gray.700">
-                  Distance:
-                </Text>{" "}
-                {formatMeterToKilometer(activity.distance)}
-              </Text>
-              <Text>
-                <Text as="span" fontWeight="medium" color="gray.700">
-                  Pace:
-                </Text>{" "}
-                {formatPace(activity.average_speed)} /km
-              </Text>
-              <Text>
-                <Text as="span" fontWeight="medium" color="gray.700">
-                  Time:
-                </Text>{" "}
-                {formatDuration(activity.elapsed_time)}
-              </Text>
-            </Flex>
+          <Box borderTopWidth="1px" borderColor="gray.200">
+            <ActivityStats />
           </Box>
-        </Box>
-      </Flex>
+        </Stack>
+      </Stack>
     </Box>
   );
-}
-
-// Utility functions
-function formatMeterToKilometer(meters) {
-  return (meters / 1000).toFixed(2) + " km";
-}
-
-function formatPace(speed) {
-  const pace = 1000 / speed; // pace in seconds per kilometer
-  const minutes = Math.floor(pace / 60);
-  const seconds = Math.round(pace % 60)
-    .toString()
-    .padStart(2, "0");
-  return `${minutes}:${seconds}`;
-}
-
-function formatDuration(seconds) {
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = Math.round(seconds % 60)
-    .toString()
-    .padStart(2, "0");
-  return hours > 0 ? `${hours}h ${minutes}min` : `${minutes}min ${secs}s`;
 }
 
 export default Activity;
