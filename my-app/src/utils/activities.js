@@ -1,13 +1,16 @@
 import axios from "axios";
 import { saveActivities } from "./db";
+import { getValidAccessToken } from "./auth";
 
 export const fetchActivities = async (
   athlete,
   accessToken,
   setLoadingActivities,
-  toast
+  toast,
+  setAthlete,
+  setAccessToken
 ) => {
-  if (!athlete || !accessToken) {
+  if (!athlete) {
     toast({
       title: "Cannot refresh activities",
       description: "Please log in first",
@@ -21,11 +24,14 @@ export const fetchActivities = async (
 
   setLoadingActivities(true);
   try {
+    // Get a valid access token
+    const validToken = await getValidAccessToken(setAthlete, setAccessToken);
+
     const response = await axios.get(
       "https://www.strava.com/api/v3/athlete/activities",
       {
         headers: {
-          Authorization: `Bearer ${accessToken}`,
+          Authorization: `Bearer ${validToken}`,
         },
         params: {
           per_page: 200,
@@ -39,14 +45,28 @@ export const fetchActivities = async (
     return activities;
   } catch (error) {
     console.error("Error fetching activities:", error);
-    toast({
-      title: "Error fetching activities",
-      description: error.response?.data?.message || "Please try again later",
-      status: "error",
-      duration: 3000,
-      isClosable: true,
-      position: "top",
-    });
+
+    // If the error is related to authentication, prompt user to log in again
+    if (error.response?.status === 401) {
+      toast({
+        title: "Authentication Error",
+        description: "Please log in again to continue",
+        status: "error",
+        duration: 5000,
+        isClosable: true,
+        position: "top",
+      });
+    } else {
+      toast({
+        title: "Error fetching activities",
+        description: error.response?.data?.message || "Please try again later",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+        position: "top",
+      });
+    }
+
     throw error;
   } finally {
     setLoadingActivities(false);
@@ -56,15 +76,20 @@ export const fetchActivities = async (
 export const updateActivityOnStrava = async (
   activityId,
   { title, description },
-  accessToken
+  accessToken,
+  setAthlete,
+  setAccessToken
 ) => {
   try {
+    // Get a valid access token
+    const validToken = await getValidAccessToken(setAthlete, setAccessToken);
+
     const response = await fetch(
       `https://www.strava.com/api/v3/activities/${activityId}`,
       {
         method: "PUT",
         headers: {
-          Authorization: `Bearer ${accessToken}`,
+          Authorization: `Bearer ${validToken}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({

@@ -40,10 +40,15 @@ export const handleAuthorizationCallback = async (
       redirect_uri: redirectUri,
     });
 
-    const accessToken = response.data.access_token;
+    const { access_token, refresh_token, expires_at } = response.data;
     setAthlete(response.data.athlete);
-    setAccessToken(accessToken);
-    localStorage.setItem("accessToken", accessToken);
+    setAccessToken(access_token);
+
+    // Store all token information
+    localStorage.setItem("accessToken", access_token);
+    localStorage.setItem("refreshToken", refresh_token);
+    localStorage.setItem("tokenExpiresAt", expires_at);
+
     navigate("/");
   } catch (error) {
     console.error("Error exchanging authorization code for access token:", {
@@ -55,10 +60,78 @@ export const handleAuthorizationCallback = async (
   }
 };
 
+export const refreshAccessToken = async (
+  setAthlete = null,
+  setAccessToken = null
+) => {
+  const clientId = "107512";
+  const clientSecret = "1a8f803010a6cd40f81e426960729461ebc7523c";
+  const refreshToken = localStorage.getItem("refreshToken");
+
+  if (!refreshToken) {
+    // If no refresh token is available, force logout
+    if (setAthlete && setAccessToken) {
+      await logout(setAthlete, setAccessToken);
+    }
+    throw new Error("No refresh token available");
+  }
+
+  try {
+    const response = await axios.post("https://www.strava.com/oauth/token", {
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: refreshToken,
+      grant_type: "refresh_token",
+    });
+
+    const { access_token, refresh_token, expires_at } = response.data;
+
+    // Update stored tokens
+    localStorage.setItem("accessToken", access_token);
+    localStorage.setItem("refreshToken", refresh_token);
+    localStorage.setItem("tokenExpiresAt", expires_at);
+
+    return access_token;
+  } catch (error) {
+    console.error(
+      "Error refreshing access token:",
+      error.response?.data || error
+    );
+    // If token refresh fails, force logout
+    if (setAthlete && setAccessToken) {
+      await logout(setAthlete, setAccessToken);
+    }
+    throw error;
+  }
+};
+
+export const getValidAccessToken = async (
+  setAthlete = null,
+  setAccessToken = null
+) => {
+  const currentTime = Math.floor(Date.now() / 1000);
+  const expiresAt = parseInt(localStorage.getItem("tokenExpiresAt"));
+  const accessToken = localStorage.getItem("accessToken");
+
+  // If token is expired or will expire in the next 5 minutes
+  if (!accessToken || !expiresAt || currentTime > expiresAt - 300) {
+    try {
+      return await refreshAccessToken(setAthlete, setAccessToken);
+    } catch (error) {
+      // If refresh fails, the user will already be logged out by refreshAccessToken
+      throw new Error("Failed to refresh access token");
+    }
+  }
+
+  return accessToken;
+};
+
 export const logout = async (setAthlete, setAccessToken) => {
   setAthlete(null);
   setAccessToken("");
   localStorage.removeItem("accessToken");
+  localStorage.removeItem("refreshToken");
+  localStorage.removeItem("tokenExpiresAt");
   await clearData();
 };
 
