@@ -53,12 +53,12 @@ export const getAthlete = async () => {
 
 export const clearData = async () => {
   const db = await initDB();
-  const tx1 = db.transaction("activities", "readwrite");
-  const tx2 = db.transaction("athlete", "readwrite");
+  const tx = db.transaction(["activities", "athlete"], "readwrite");
 
-  await tx1.objectStore("activities").clear();
-  await tx2.objectStore("athlete").clear();
+  await Promise.all([
+    tx.objectStore("activities").clear(),
+    tx.objectStore("athlete").clear(),
+  ]);
 
-  await tx1.done;
-  await tx2.done;
+  await tx.done;
 };
