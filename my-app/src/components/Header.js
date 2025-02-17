@@ -21,6 +21,7 @@ import {
   StarIcon,
   SettingsIcon,
 } from "@chakra-ui/icons";
+import ChestModal from "./ChestModal";
 
 const ADMIN_ATHLETE_ID = 32945540;
 
@@ -33,12 +34,15 @@ const popAnimation = keyframes`
 const Header = ({ handleLogin, athlete, logout, tokens = 0 }) => {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [isTokenAnimating, setIsTokenAnimating] = useState(false);
+  const [isChestModalOpen, setIsChestModalOpen] = useState(false);
+  const [localTokens, setLocalTokens] = useState(tokens);
   const navigate = useNavigate();
   const toast = useToast();
   const url = window.location.href;
   const isPaceCalculator = url.includes("pace-calculator");
 
   useEffect(() => {
+    setLocalTokens(tokens);
     setIsTokenAnimating(true);
     const timer = setTimeout(() => setIsTokenAnimating(false), 500);
     return () => clearTimeout(timer);
@@ -138,10 +142,14 @@ const Header = ({ handleLogin, athlete, logout, tokens = 0 }) => {
                     ? `${popAnimation} 0.5s ease-in-out`
                     : undefined
                 }
+                cursor="pointer"
+                onClick={() => setIsChestModalOpen(true)}
+                _hover={{ bg: "yellow.200" }}
+                transition="all 0.2s"
               >
                 <StarIcon color="yellow.500" />
                 <Text fontWeight="bold" color="yellow.700">
-                  {tokens}
+                  {localTokens}
                 </Text>
               </Flex>
             )}
@@ -216,6 +224,13 @@ const Header = ({ handleLogin, athlete, logout, tokens = 0 }) => {
           </Flex>
         )}
       </Flex>
+
+      <ChestModal
+        isOpen={isChestModalOpen}
+        onClose={() => setIsChestModalOpen(false)}
+        tokens={localTokens}
+        setTokens={setLocalTokens}
+      />
     </Box>
   );
 };
