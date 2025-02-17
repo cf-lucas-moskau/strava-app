@@ -14,8 +14,15 @@ import {
   useToast,
   keyframes,
 } from "@chakra-ui/react";
-import { Link } from "react-router-dom";
-import { ChevronDownIcon, DownloadIcon, StarIcon } from "@chakra-ui/icons";
+import { Link, useNavigate } from "react-router-dom";
+import {
+  ChevronDownIcon,
+  DownloadIcon,
+  StarIcon,
+  SettingsIcon,
+} from "@chakra-ui/icons";
+
+const ADMIN_ATHLETE_ID = 32945540;
 
 const popAnimation = keyframes`
   0% { transform: scale(1); }
@@ -26,6 +33,7 @@ const popAnimation = keyframes`
 const Header = ({ handleLogin, athlete, logout, tokens = 0 }) => {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [isTokenAnimating, setIsTokenAnimating] = useState(false);
+  const navigate = useNavigate();
   const toast = useToast();
   const url = window.location.href;
   const isPaceCalculator = url.includes("pace-calculator");
@@ -136,6 +144,18 @@ const Header = ({ handleLogin, athlete, logout, tokens = 0 }) => {
                   {tokens}
                 </Text>
               </Flex>
+            )}
+
+            {athlete && athlete.id === ADMIN_ATHLETE_ID && (
+              <Button
+                onClick={() => navigate("/admin")}
+                leftIcon={<SettingsIcon />}
+                colorScheme="purple"
+                variant="solid"
+                size="md"
+              >
+                Admin
+              </Button>
             )}
 
             {deferredPrompt && (

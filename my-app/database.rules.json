@@ -1,0 +1,26 @@
+{
+  "rules": {
+    ".read": "auth != null",
+    "claimedTokens": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        ".write": "auth != null && auth.uid == $uid"
+      }
+    },
+    "trainingPlanRequests": {
+      ".read": "auth != null && (auth.uid == '32945540' || root.child('trainingPlanRequests').child(auth.uid).exists())",
+      "$athleteId": {
+        ".write": "auth != null && auth.uid == $athleteId",
+        ".validate": "newData.hasChildren(['athleteId', 'athleteName', 'requestDate', 'status'])"
+      }
+    },
+    "trainingPlans": {
+      ".read": "auth != null",
+      ".write": "auth != null && auth.uid == '32945540'",
+      "$athleteId": {
+        ".read": "auth != null && (auth.uid == $athleteId || auth.uid == '32945540')",
+        ".validate": "newData.hasChildren(['trainings', 'lastUpdated'])"
+      }
+    }
+  }
+}

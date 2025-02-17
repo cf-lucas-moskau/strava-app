@@ -16,7 +16,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const messaging = getMessaging(app);
-const database = getDatabase(app);
+export const database = getDatabase(app);
 
 export const saveClaimedToken = async (athleteId, trainingId) => {
   try {
