@@ -26,12 +26,24 @@ import {
   TabPanels,
   Tab,
   TabPanel,
+  Button,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalCloseButton,
+  FormControl,
+  FormLabel,
+  Input,
+  VStack,
+  Flex,
 } from "@chakra-ui/react";
 import { database } from "../firebase-config";
-import { ref, onValue, off } from "firebase/database";
+import { ref, onValue, off, set } from "firebase/database";
 import Header from "./Header";
 import { handleLogin } from "../utils/auth";
-import { ChevronDownIcon } from "@chakra-ui/icons";
+import { ChevronDownIcon, AddIcon } from "@chakra-ui/icons";
 import {
   ADMIN_ATHLETE_ID,
   STATUS_OPTIONS,
@@ -43,6 +55,12 @@ const AdminPage = ({ athlete }) => {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(null);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [newRequest, setNewRequest] = useState({
+    athleteId: "",
+    athleteName: "",
+    email: "",
+  });
   const toast = useToast();
 
   useEffect(() => {
@@ -116,6 +134,55 @@ const AdminPage = ({ athlete }) => {
     }
   };
 
+  const handleAddRequest = async () => {
+    if (!athlete || athlete.id !== ADMIN_ATHLETE_ID) return;
+    if (!newRequest.athleteId || !newRequest.athleteName) {
+      toast({
+        title: "Missing Information",
+        description: "Please fill in all required fields",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    try {
+      const requestRef = ref(
+        database,
+        `trainingPlanRequests/${newRequest.athleteId}`
+      );
+      await set(requestRef, {
+        ...newRequest,
+        status: "pending",
+        requestDate: new Date().toISOString(),
+      });
+
+      toast({
+        title: "Request Added",
+        description: "Training plan request has been created successfully",
+        status: "success",
+        duration: 3000,
+        isClosable: true,
+      });
+      setIsAddModalOpen(false);
+      setNewRequest({
+        athleteId: "",
+        athleteName: "",
+        email: "",
+      });
+    } catch (error) {
+      console.error("Error adding request:", error);
+      toast({
+        title: "Error",
+        description: "Failed to add request. Please try again.",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+    }
+  };
+
   if (!athlete || athlete.id !== ADMIN_ATHLETE_ID) {
     return (
       <Box>
@@ -145,7 +212,16 @@ const AdminPage = ({ athlete }) => {
 
           <TabPanels>
             <TabPanel>
-              <Heading mb={6}>Training Plan Requests</Heading>
+              <Flex justify="space-between" align="center" mb={6}>
+                <Heading>Training Plan Requests</Heading>
+                <Button
+                  leftIcon={<AddIcon />}
+                  colorScheme="teal"
+                  onClick={() => setIsAddModalOpen(true)}
+                >
+                  Add Request
+                </Button>
+              </Flex>
               {loading ? (
                 <Box textAlign="center" py={8}>
                   <Spinner size="xl" color="purple.500" />
@@ -235,6 +311,74 @@ const AdminPage = ({ athlete }) => {
             </TabPanel>
           </TabPanels>
         </Tabs>
+
+        {/* Add Request Modal */}
+        <Modal
+          isOpen={isAddModalOpen}
+          onClose={() => setIsAddModalOpen(false)}
+          size="md"
+        >
+          <ModalOverlay />
+          <ModalContent>
+            <ModalHeader>Add Training Plan Request</ModalHeader>
+            <ModalCloseButton />
+            <ModalBody pb={6}>
+              <VStack spacing={4}>
+                <FormControl isRequired>
+                  <FormLabel>Athlete ID</FormLabel>
+                  <Input
+                    value={newRequest.athleteId}
+                    onChange={(e) =>
+                      setNewRequest({
+                        ...newRequest,
+                        athleteId: e.target.value,
+                      })
+                    }
+                    placeholder="Enter athlete ID"
+                  />
+                </FormControl>
+
+                <FormControl isRequired>
+                  <FormLabel>Athlete Name</FormLabel>
+                  <Input
+                    value={newRequest.athleteName}
+                    onChange={(e) =>
+                      setNewRequest({
+                        ...newRequest,
+                        athleteName: e.target.value,
+                      })
+                    }
+                    placeholder="Enter athlete name"
+                  />
+                </FormControl>
+
+                <FormControl>
+                  <FormLabel>Email (optional)</FormLabel>
+                  <Input
+                    value={newRequest.email}
+                    onChange={(e) =>
+                      setNewRequest({
+                        ...newRequest,
+                        email: e.target.value,
+                      })
+                    }
+                    placeholder="Enter email address"
+                    type="email"
+                  />
+                </FormControl>
+
+                <Button
+                  colorScheme="teal"
+                  width="100%"
+                  mt={4}
+                  onClick={handleAddRequest}
+                >
+                  Add Request
+                </Button>
+              </VStack>
+            </ModalBody>
+          </ModalContent>
+        </Modal>
       </Container>
     </Box>
   );
