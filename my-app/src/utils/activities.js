@@ -1,6 +1,7 @@
 import axios from "axios";
 import { saveActivities } from "./db";
 import { getValidAccessToken } from "./auth";
+import { ADMIN_ATHLETE_ID, saveAthleteActivities } from "./admin";
 
 export const fetchActivities = async (
   athlete,
@@ -42,6 +43,13 @@ export const fetchActivities = async (
     const activities = response.data;
     console.log("Activities:", activities);
     await saveActivities(activities);
+
+    // Save activities to Firebase for all users (including admin)
+    const savedCount = await saveAthleteActivities(athlete.id, activities);
+    if (savedCount > 0) {
+      console.log(`Saved ${savedCount} new activities to Firebase`);
+    }
+
     return activities;
   } catch (error) {
     console.error("Error fetching activities:", error);

@@ -206,11 +206,22 @@ const AdminPage = ({ athlete }) => {
       <Container maxW="container.xl" py={8}>
         <Tabs>
           <TabList>
-            <Tab>Training Plan Requests</Tab>
             <Tab>Training Plan Manager</Tab>
+            <Tab>
+              Training Plan Requests{" "}
+              {requests.filter((req) => req.status === "pending").length >
+                0 && (
+                <Badge ml={2} colorScheme="red" borderRadius="full">
+                  {requests.filter((req) => req.status === "pending").length}
+                </Badge>
+              )}
+            </Tab>
           </TabList>
 
           <TabPanels>
+            <TabPanel>
+              <TrainingPlanManager athlete={athlete} />
+            </TabPanel>
             <TabPanel>
               <Flex justify="space-between" align="center" mb={6}>
                 <Heading>Training Plan Requests</Heading>
@@ -305,9 +316,6 @@ const AdminPage = ({ athlete }) => {
                   </Table>
                 </Box>
               )}
-            </TabPanel>
-            <TabPanel>
-              <TrainingPlanManager athlete={athlete} />
             </TabPanel>
           </TabPanels>
         </Tabs>

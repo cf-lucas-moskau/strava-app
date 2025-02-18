@@ -21,6 +21,29 @@
         ".read": "auth != null && (auth.uid == $athleteId || auth.uid == '32945540')",
         ".validate": "newData.hasChildren(['trainings', 'lastUpdated'])"
       }
+    },
+    "athleteActivities": {
+      ".read": "auth != null && auth.uid == '32945540'",
+      "$athleteId": {
+        ".read": "auth != null && (auth.uid == $athleteId || auth.uid == '32945540')",
+        ".write": "auth != null && auth.uid == $athleteId",
+        "$activityId": {
+          ".validate": "newData.hasChildren(['id', 'type', 'start_date_local', 'distance'])"
+        }
+      }
+    },
+    "athleteActivitiesMeta": {
+      ".read": "auth != null && auth.uid == '32945540'",
+      "$athleteId": {
+        ".read": "auth != null && (auth.uid == $athleteId || auth.uid == '32945540')",
+        ".write": "auth != null && (auth.uid == $athleteId || auth.uid == '32945540')",
+        "count": {
+          ".validate": "newData.isNumber()"
+        },
+        "lastSeenByAdmin": {
+          ".validate": "newData.isString() && auth.uid == '32945540'"
+        }
+      }
     }
   }
 }

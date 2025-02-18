@@ -13,6 +13,7 @@ import {
   Avatar,
   useToast,
   keyframes,
+  Circle,
 } from "@chakra-ui/react";
 import { Link, useNavigate } from "react-router-dom";
 import {
@@ -22,6 +23,7 @@ import {
   SettingsIcon,
 } from "@chakra-ui/icons";
 import ChestModal from "./ChestModal";
+import { getUnseenAthletes } from "../utils/admin";
 
 const ADMIN_ATHLETE_ID = 32945540;
 
@@ -36,6 +38,7 @@ const Header = ({ handleLogin, athlete, logout, tokens = 0 }) => {
   const [isTokenAnimating, setIsTokenAnimating] = useState(false);
   const [isChestModalOpen, setIsChestModalOpen] = useState(false);
   const [localTokens, setLocalTokens] = useState(tokens);
+  const [hasUnseenAthletes, setHasUnseenAthletes] = useState(false);
   const navigate = useNavigate();
   const toast = useToast();
   const url = window.location.href;
@@ -65,6 +68,21 @@ const Header = ({ handleLogin, athlete, logout, tokens = 0 }) => {
       );
     };
   }, []);
+
+  useEffect(() => {
+    const checkUnseenAthletes = async () => {
+      if (athlete?.id === ADMIN_ATHLETE_ID) {
+        const unseenAthletes = await getUnseenAthletes();
+        setHasUnseenAthletes(unseenAthletes.length > 0);
+      }
+    };
+
+    checkUnseenAthletes();
+    // Set up polling to check for unseen athletes every minute
+    const interval = setInterval(checkUnseenAthletes, 60000);
+
+    return () => clearInterval(interval);
+  }, [athlete]);
 
   const handleInstallClick = async () => {
     if (!deferredPrompt) {
@@ -155,15 +173,26 @@ const Header = ({ handleLogin, athlete, logout, tokens = 0 }) => {
             )}
 
             {athlete && athlete.id === ADMIN_ATHLETE_ID && (
-              <Button
-                onClick={() => navigate("/admin")}
-                leftIcon={<SettingsIcon />}
-                colorScheme="purple"
-                variant="solid"
-                size="md"
-              >
-                Admin
-              </Button>
+              <Box position="relative">
+                <Button
+                  onClick={() => navigate("/admin")}
+                  leftIcon={<SettingsIcon />}
+                  colorScheme="purple"
+                  variant="solid"
+                  size="md"
+                >
+                  Admin
+                </Button>
+                {hasUnseenAthletes && (
+                  <Circle
+                    size="10px"
+                    bg="red.500"
+                    position="absolute"
+                    top="-1"
+                    right="-1"
+                  />
+                )}
+              </Box>
             )}
 
             {deferredPrompt && (
