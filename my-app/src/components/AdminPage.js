@@ -40,7 +40,7 @@ import {
   Flex,
 } from "@chakra-ui/react";
 import { database } from "../firebase-config";
-import { ref, onValue, off, set } from "firebase/database";
+import { ref, onValue, off, set, remove } from "firebase/database";
 import Header from "./Header";
 import { handleLogin } from "../utils/auth";
 import { ChevronDownIcon, AddIcon } from "@chakra-ui/icons";
@@ -50,6 +50,7 @@ import {
   updateTrainingPlanRequestStatus,
 } from "../utils/admin";
 import TrainingPlanManager from "./TrainingPlanManager";
+import { initializeSampleCosmetics } from "../utils/cosmetics";
 
 const AdminPage = ({ athlete }) => {
   const [requests, setRequests] = useState([]);
@@ -61,6 +62,7 @@ const AdminPage = ({ athlete }) => {
     athleteName: "",
     email: "",
   });
+  const [isResettingCosmetics, setIsResettingCosmetics] = useState(false);
   const toast = useToast();
 
   useEffect(() => {
@@ -180,6 +182,51 @@ const AdminPage = ({ athlete }) => {
         duration: 3000,
         isClosable: true,
       });
+    }
+  };
+
+  const handleResetCosmetics = async () => {
+    if (!athlete || athlete.id !== ADMIN_ATHLETE_ID) {
+      toast({
+        title: "Unauthorized",
+        description: "Only admin can reset cosmetics",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    setIsResettingCosmetics(true);
+    try {
+      // Delete all existing cosmetics
+      await remove(ref(database, "cosmetics/items"));
+
+      // Add sample cosmetics
+      const success = await initializeSampleCosmetics();
+
+      if (success) {
+        toast({
+          title: "Success",
+          description: "Sample cosmetics have been reset",
+          status: "success",
+          duration: 3000,
+          isClosable: true,
+        });
+      } else {
+        throw new Error("Failed to initialize sample cosmetics");
+      }
+    } catch (error) {
+      console.error("Error resetting cosmetics:", error);
+      toast({
+        title: "Error",
+        description: "Failed to reset cosmetics",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+    } finally {
+      setIsResettingCosmetics(false);
     }
   };
 
@@ -387,6 +434,21 @@ const AdminPage = ({ athlete }) => {
             </ModalBody>
           </ModalContent>
         </Modal>
+
+        {/* Add this new section before the training plan requests section */}
+        <Box mb={8} p={6} borderWidth="1px" borderRadius="lg" bg="white">
+          <Heading size="md" mb={4}>
+            Cosmetics Management
+          </Heading>
+          <Button
+            colorScheme="purple"
+            onClick={handleResetCosmetics}
+            isLoading={isResettingCosmetics}
+            loadingText="Resetting Cosmetics..."
+          >
+            Reset Sample Cosmetics
+          </Button>
+        </Box>
       </Container>
     </Box>
   );

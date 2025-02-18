@@ -1,6 +1,5 @@
 import { database } from "../firebase-config";
-import { ref, get, set } from "firebase/database";
-import { getThisWeeksTrainings } from "./training";
+import { ref, get, set, update } from "firebase/database";
 
 export const saveClaimedToken = async (athlete, activity) => {
   if (!athlete || !activity) return;
@@ -12,6 +11,7 @@ export const saveClaimedToken = async (athlete, activity) => {
   await set(claimedTokenRef, {
     activityId: activity.id,
     claimedAt: new Date().toISOString(),
+    spent: false,
   });
 };
 
@@ -31,7 +31,11 @@ export const getClaimedTokensCount = async (athlete) => {
 
   const claimedTokensRef = ref(database, `claimedTokens/${athlete.id}`);
   const snapshot = await get(claimedTokensRef);
-  return snapshot.exists() ? Object.keys(snapshot.val()).length : 0;
+  if (!snapshot.exists()) return 0;
+
+  // Count only unspent tokens
+  const tokens = snapshot.val();
+  return Object.values(tokens).filter((token) => !token.spent).length;
 };
 
 export const claimToken = async (
@@ -100,7 +104,36 @@ export const checkAndUpdateClaimedTokens = async (
     }
   }
 
+  // Count only unspent tokens
+  const unspentTokenCount = Object.values(claimedTokens).filter(
+    (token) => !token.spent
+  ).length;
+
   setUnclaimedTokens(unclaimedTokensMap);
-  setTokens(Object.keys(claimedTokens).length);
-  localStorage.setItem("tokens", Object.keys(claimedTokens).length.toString());
+  setTokens(unspentTokenCount);
+  localStorage.setItem("tokens", unspentTokenCount.toString());
+};
+
+export const spendTokens = async (athlete, amount) => {
+  if (!athlete || amount <= 0) return false;
+
+  const claimedTokensRef = ref(database, `claimedTokens/${athlete.id}`);
+  const snapshot = await get(claimedTokensRef);
+  if (!snapshot.exists()) return false;
+
+  const tokens = snapshot.val();
+  const unspentTokens = Object.entries(tokens)
+    .filter(([_, token]) => !token.spent)
+    .sort((a, b) => new Date(a[1].claimedAt) - new Date(b[1].claimedAt));
+
+  if (unspentTokens.length < amount) return false;
+
+  const updates = {};
+  for (let i = 0; i < amount; i++) {
+    const [tokenId, token] = unspentTokens[i];
+    updates[`claimedTokens/${athlete.id}/${tokenId}/spent`] = true;
+  }
+
+  await update(ref(database), updates);
+  return true;
 };

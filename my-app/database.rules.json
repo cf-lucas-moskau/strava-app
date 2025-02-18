@@ -7,6 +7,30 @@
         ".write": "auth != null && auth.uid == $uid"
       }
     },
+    "cosmetics": {
+      ".read": "auth != null",
+      ".write": "auth != null && auth.uid == '32945540'",
+      "items": {
+        "$itemId": {
+          ".validate": "newData.hasChildren(['name', 'type', 'rarity', 'preview'])"
+        }
+      }
+    },
+    "profiles": {
+      "$uid": {
+        ".read": "auth != null",
+        ".write": "auth != null && auth.uid == $uid",
+        "inventory": {
+          ".read": "auth != null",
+          ".write": "auth != null && auth.uid == $uid"
+        },
+        "equipped": {
+          ".read": "auth != null",
+          ".write": "auth != null && auth.uid == $uid",
+          ".validate": "newData.hasChildren(['profileFrame', 'background', 'activityTheme', 'achievementStyle'])"
+        }
+      }
+    },
     "trainingPlanRequests": {
       ".read": "auth != null && (auth.uid == '32945540' || root.child('trainingPlanRequests').child(auth.uid).exists())",
       "$athleteId": {

@@ -12,14 +12,12 @@ import { claimToken, checkAndUpdateClaimedTokens } from "./utils/tokens";
 import { hasTrainingPlan } from "./utils/training";
 import { handleLogin, handleAuthorizationCallback, logout } from "./utils/auth";
 import { fetchActivities, updateActivityOnStrava } from "./utils/activities";
-import { calculateAchievementProgress } from "./utils/achievementCalculator";
-import { achievementsList } from "./utils/achievements";
+import { getUserProfile, getAvailableCosmetics } from "./utils/cosmetics";
+import axios from "axios";
 
 import { Box, Flex, Text, Button, Spinner } from "@chakra-ui/react";
 import Activity from "./components/Activity";
 import { RepeatIcon } from "@chakra-ui/icons";
-import AchievementsDisplay from "./components/AchievementsDisplay";
-import axios from "axios";
 import Header from "./components/Header";
 import Welcome from "./components/Welcome";
 import WeeklyProgress from "./components/WeeklyProgress";
@@ -27,8 +25,9 @@ import WeeklyTrainingGrid from "./components/WeeklyTrainingGrid";
 import UnmatchedRuns from "./components/UnmatchedRuns";
 import RequestTrainingPlan from "./components/RequestTrainingPlan";
 import AdminPage from "./components/AdminPage";
+import Profile from "./components/Profile";
 
-function Home({ admin }) {
+function Home({ admin, profile }) {
   const navigate = useNavigate();
   const toast = useToast();
 
@@ -52,12 +51,14 @@ function Home({ admin }) {
   const [athlete, setAthlete] = useState(null);
   const [activities, setActivities] = useState(null);
   const [loadingActivities, setLoadingActivities] = useState(false);
-  const [userAchievements, setUserAchievements] = useState({});
   const [isInitialized, setIsInitialized] = useState(false);
   const [lastFetchTimestamp, setLastFetchTimestamp] = useState(0);
 
   const [hasTrainingPlanState, setHasTrainingPlanState] = useState(false);
   const [checkingTrainingPlan, setCheckingTrainingPlan] = useState(true);
+
+  const [userProfile, setUserProfile] = useState(null);
+  const [cosmetics, setCosmetics] = useState({});
 
   // Initialize app data
   useEffect(() => {
@@ -197,14 +198,6 @@ function Home({ admin }) {
     navigate(`/run/${activityId}`);
   };
 
-  useEffect(() => {
-    if (activities && athlete && !loadingActivities) {
-      // Calculate achievements
-      const progress = calculateAchievementProgress(activities);
-      setUserAchievements(progress);
-    }
-  }, [activities?.length, athlete?.id, loadingActivities]); // Only recalculate when activities length or athlete ID changes
-
   const getWeekLabel = (offset = 0) => {
     if (offset === 0) return "This Week";
     if (offset === 1) return "Next Week";
@@ -236,6 +229,66 @@ function Home({ admin }) {
 
     checkTrainingPlan();
   }, [athlete?.id]);
+
+  useEffect(() => {
+    const fetchProfileData = async () => {
+      if (athlete?.id) {
+        try {
+          const [profileData, cosmeticsData] = await Promise.all([
+            getUserProfile(athlete.id),
+            getAvailableCosmetics(),
+          ]);
+          setUserProfile(profileData);
+          setCosmetics(cosmeticsData);
+        } catch (error) {
+          console.error("Error fetching profile data:", error);
+        }
+      }
+    };
+    fetchProfileData();
+  }, [athlete]);
+
+  // Get the equipped activity theme
+  const getEquippedTheme = () => {
+    if (!userProfile?.equipped?.activityTheme || !cosmetics) return null;
+    return cosmetics[userProfile.equipped.activityTheme];
+  };
+
+  const getTokenDisplay = () => {
+    if (
+      !userProfile?.equipped?.tokenStyle ||
+      !cosmetics[userProfile.equipped.tokenStyle]
+    ) {
+      return { icon: "⭐", name: "Stars" }; // Default token style
+    }
+    const style = cosmetics[userProfile.equipped.tokenStyle];
+    return { icon: style.icon, name: style.tokenName };
+  };
+
+  const tokenDisplay = getTokenDisplay();
+
+  if (!athlete) {
+    return (
+      <Box>
+        <Header handleLogin={handleLogin} athlete={athlete} />
+        <Welcome handleLogin={handleLogin} />
+      </Box>
+    );
+  }
+
+  if (profile) {
+    return (
+      <Box>
+        <Header
+          handleLogin={handleLogin}
+          athlete={athlete}
+          logout={logout}
+          tokens={tokens}
+        />
+        <Profile athlete={athlete} activities={activities} />
+      </Box>
+    );
+  }
 
   if (admin) {
     return <AdminPage athlete={athlete} />;
@@ -270,7 +323,7 @@ function Home({ admin }) {
           <Header
             handleLogin={handleLogin}
             athlete={athlete}
-            logout={() => logout(setAthlete, setAccessToken)}
+            logout={logout}
             tokens={tokens}
           />
 
@@ -366,6 +419,7 @@ function Home({ admin }) {
                             setUnclaimedTokens
                           )
                         }
+                        tokenDisplay={tokenDisplay}
                       />
                     </Box>
 
@@ -382,22 +436,6 @@ function Home({ admin }) {
                   </Box>
                 ) : null}
 
-                {/* Gamification Section */}
-                {athlete && (
-                  <Box
-                    mt={6}
-                    pt={4}
-                    borderTop="1px"
-                    borderColor="gray.200"
-                    overflow="hidden"
-                  >
-                    <AchievementsDisplay
-                      achievements={achievementsList}
-                      userProgress={userAchievements}
-                    />
-                  </Box>
-                )}
-
                 {loadingActivities && (
                   <Flex justifyContent="center" my={4}>
                     <Spinner color="teal.500" />
@@ -411,6 +449,7 @@ function Home({ admin }) {
             maxWidth={containerMaxWidth}
             margin="0 auto"
             px={containerPadding}
+            mt={8}
           >
             <div className="activity-div">
               {activities &&
@@ -427,7 +466,7 @@ function Home({ admin }) {
                       key={activity.id}
                       activity={activity}
                       loadSingleActivity={loadSingleActivity}
-                      updateActivityOnStrava={updateActivityOnStrava}
+                      theme={getEquippedTheme()}
                     />
                   ))}
             </div>

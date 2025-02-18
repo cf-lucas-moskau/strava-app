@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import {
   Box,
   Button,
-  Heading,
   Flex,
   Image,
   Menu,
@@ -12,43 +11,31 @@ import {
   Text,
   Avatar,
   useToast,
-  keyframes,
   Circle,
+  HStack,
 } from "@chakra-ui/react";
 import { Link, useNavigate } from "react-router-dom";
-import {
-  ChevronDownIcon,
-  DownloadIcon,
-  StarIcon,
-  SettingsIcon,
-} from "@chakra-ui/icons";
+import { ChevronDownIcon, DownloadIcon, SettingsIcon } from "@chakra-ui/icons";
 import ChestModal from "./ChestModal";
 import { getUnseenAthletes } from "../utils/admin";
+import { getUserProfile, getAvailableCosmetics } from "../utils/cosmetics";
 
 const ADMIN_ATHLETE_ID = 32945540;
 
-const popAnimation = keyframes`
-  0% { transform: scale(1); }
-  50% { transform: scale(1.2); }
-  100% { transform: scale(1); }
-`;
-
 const Header = ({ handleLogin, athlete, logout, tokens = 0 }) => {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
-  const [isTokenAnimating, setIsTokenAnimating] = useState(false);
-  const [isChestModalOpen, setIsChestModalOpen] = useState(false);
   const [localTokens, setLocalTokens] = useState(tokens);
   const [hasUnseenAthletes, setHasUnseenAthletes] = useState(false);
   const navigate = useNavigate();
   const toast = useToast();
   const url = window.location.href;
   const isPaceCalculator = url.includes("pace-calculator");
+  const [showChestModal, setShowChestModal] = useState(false);
+  const [userProfile, setUserProfile] = useState(null);
+  const [cosmetics, setCosmetics] = useState({});
 
   useEffect(() => {
     setLocalTokens(tokens);
-    setIsTokenAnimating(true);
-    const timer = setTimeout(() => setIsTokenAnimating(false), 500);
-    return () => clearTimeout(timer);
   }, [tokens]);
 
   useEffect(() => {
@@ -84,6 +71,24 @@ const Header = ({ handleLogin, athlete, logout, tokens = 0 }) => {
     return () => clearInterval(interval);
   }, [athlete]);
 
+  useEffect(() => {
+    const fetchData = async () => {
+      if (athlete?.id) {
+        try {
+          const [profile, availableCosmetics] = await Promise.all([
+            getUserProfile(athlete.id),
+            getAvailableCosmetics(),
+          ]);
+          setUserProfile(profile);
+          setCosmetics(availableCosmetics);
+        } catch (error) {
+          console.error("Error fetching profile data:", error);
+        }
+      }
+    };
+    fetchData();
+  }, [athlete]);
+
   const handleInstallClick = async () => {
     if (!deferredPrompt) {
       toast({
@@ -117,6 +122,19 @@ const Header = ({ handleLogin, athlete, logout, tokens = 0 }) => {
     setDeferredPrompt(null);
   };
 
+  const getTokenDisplay = () => {
+    if (
+      !userProfile?.equipped?.tokenStyle ||
+      !cosmetics[userProfile.equipped.tokenStyle]
+    ) {
+      return { icon: "⭐", name: "Stars" }; // Default token style
+    }
+    const style = cosmetics[userProfile.equipped.tokenStyle];
+    return { icon: style.icon, name: style.tokenName };
+  };
+
+  const tokenDisplay = getTokenDisplay();
+
   return (
     <Box
       as="nav"
@@ -148,51 +166,42 @@ const Header = ({ handleLogin, athlete, logout, tokens = 0 }) => {
         {!isPaceCalculator && (
           <Flex align="center" gap={6}>
             {athlete && (
-              <Flex
-                align="center"
-                gap={2}
-                bg="yellow.100"
-                px={3}
-                py={2}
-                borderRadius="full"
-                animation={
-                  isTokenAnimating
-                    ? `${popAnimation} 0.5s ease-in-out`
-                    : undefined
-                }
-                cursor="pointer"
-                onClick={() => setIsChestModalOpen(true)}
-                _hover={{ bg: "yellow.200" }}
-                transition="all 0.2s"
-              >
-                <StarIcon color="yellow.500" />
-                <Text fontWeight="bold" color="yellow.700">
-                  {localTokens}
-                </Text>
-              </Flex>
-            )}
-
-            {athlete && athlete.id === ADMIN_ATHLETE_ID && (
-              <Box position="relative">
-                <Button
-                  onClick={() => navigate("/admin")}
-                  leftIcon={<SettingsIcon />}
-                  colorScheme="purple"
-                  variant="solid"
-                  size="md"
-                >
-                  Admin
-                </Button>
-                {hasUnseenAthletes && (
-                  <Circle
-                    size="10px"
-                    bg="red.500"
-                    position="absolute"
-                    top="-1"
-                    right="-1"
-                  />
+              <>
+                <HStack spacing={4} mr={4}>
+                  <Text fontWeight="medium">
+                    {localTokens} {tokenDisplay.icon} {tokenDisplay.name}
+                  </Text>
+                  <Button
+                    colorScheme="teal"
+                    size="sm"
+                    onClick={() => setShowChestModal(true)}
+                  >
+                    Open Chest
+                  </Button>
+                </HStack>
+                {athlete.id === ADMIN_ATHLETE_ID && (
+                  <Box position="relative">
+                    <Button
+                      onClick={() => navigate("/admin")}
+                      leftIcon={<SettingsIcon />}
+                      colorScheme="purple"
+                      variant="solid"
+                      size="md"
+                    >
+                      Admin
+                    </Button>
+                    {hasUnseenAthletes && (
+                      <Circle
+                        size="10px"
+                        bg="red.500"
+                        position="absolute"
+                        top="-1"
+                        right="-1"
+                      />
+                    )}
+                  </Box>
                 )}
-              </Box>
+              </>
             )}
 
             {deferredPrompt && (
@@ -230,6 +239,15 @@ const Header = ({ handleLogin, athlete, logout, tokens = 0 }) => {
                 </MenuButton>
                 <MenuList shadow="lg" minW="unset" w="160px">
                   <MenuItem
+                    as={Link}
+                    to="/profile"
+                    _hover={{ bg: "gray.50" }}
+                    fontWeight="medium"
+                    w="150px"
+                  >
+                    Profile
+                  </MenuItem>
+                  <MenuItem
                     onClick={logout}
                     _hover={{ bg: "gray.50" }}
                     fontWeight="medium"
@@ -254,12 +272,16 @@ const Header = ({ handleLogin, athlete, logout, tokens = 0 }) => {
         )}
       </Flex>
 
-      <ChestModal
-        isOpen={isChestModalOpen}
-        onClose={() => setIsChestModalOpen(false)}
-        tokens={localTokens}
-        setTokens={setLocalTokens}
-      />
+      {athlete && (
+        <ChestModal
+          isOpen={showChestModal}
+          onClose={() => setShowChestModal(false)}
+          tokens={localTokens}
+          setTokens={setLocalTokens}
+          athlete={athlete}
+          tokenDisplay={tokenDisplay}
+        />
+      )}
     </Box>
   );
 };

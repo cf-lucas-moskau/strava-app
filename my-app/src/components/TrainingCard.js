@@ -11,7 +11,7 @@ import {
   Button,
   keyframes,
 } from "@chakra-ui/react";
-import { CheckIcon, TimeIcon, CloseIcon, StarIcon } from "@chakra-ui/icons";
+import { CheckIcon, TimeIcon, CloseIcon } from "@chakra-ui/icons";
 
 const glowAnimation = keyframes`
   0% { box-shadow: 0 0 5px #FFD700; }
@@ -25,6 +25,7 @@ const TrainingCard = ({
   convertToPace,
   onClaimToken,
   canClaim,
+  tokenDisplay = { icon: "⭐", name: "Stars" },
 }) => {
   const isCompleted = event.completed;
 
@@ -97,10 +98,10 @@ const TrainingCard = ({
                 colorScheme="yellow"
                 size="sm"
                 px={4}
-                leftIcon={<StarIcon boxSize={3} />}
+                leftIcon={<Text>{tokenDisplay.icon}</Text>}
                 animation={`${glowAnimation} 2s infinite`}
               >
-                Claim Token
+                Claim {tokenDisplay.name}
               </Button>
             </Flex>
           ) : (
@@ -108,7 +109,7 @@ const TrainingCard = ({
               <Badge colorScheme="green" p={2} borderRadius="md">
                 <Flex align="center" gap={2}>
                   <CheckIcon />
-                  Token Claimed
+                  {tokenDisplay.name} Claimed
                 </Flex>
               </Badge>
             </Flex>

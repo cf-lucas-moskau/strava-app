@@ -10,6 +10,7 @@ const WeeklyTrainingGrid = ({
   weekOffset,
   unclaimedTokens,
   onClaimToken,
+  tokenDisplay = { icon: "⭐", name: "Stars" },
 }) => {
   const [weeklyTrainings, setWeeklyTrainings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -63,6 +64,7 @@ const WeeklyTrainingGrid = ({
             convertToPace={convertToPace}
             onClaimToken={() => onClaimToken(event, event.matchedActivity)}
             canClaim={canClaim}
+            tokenDisplay={tokenDisplay}
           />
         );
       })}

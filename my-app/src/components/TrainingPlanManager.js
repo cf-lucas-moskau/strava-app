@@ -41,18 +41,10 @@ import {
   ADMIN_ATHLETE_ID,
   createTrainingPlan,
   updateTrainingPlan,
-  getAllTrainingPlans,
   getAthleteActivities,
   STATUS_OPTIONS,
 } from "../utils/admin";
-import {
-  formatMeterToKilometer,
-  formatDuration,
-  metersPerSecondsToPace,
-} from "../utils/formatters";
 import Activity from "../components/Activity";
-
-const ITEMS_PER_PAGE = 10;
 
 const TrainingPlanManager = ({ athlete }) => {
   const [selectedAthleteId, setSelectedAthleteId] = useState("");
@@ -79,7 +71,6 @@ const TrainingPlanManager = ({ athlete }) => {
   useEffect(() => {
     if (!athlete || athlete.id !== ADMIN_ATHLETE_ID) return;
 
-    const trainingPlansRef = ref(database, "trainingPlans");
     const requestsRef = ref(database, "trainingPlanRequests");
     const metaRef = ref(database, "athleteActivitiesMeta");
 
@@ -191,11 +182,6 @@ const TrainingPlanManager = ({ athlete }) => {
 
     fetchAthleteActivities();
   }, [selectedAthleteId, currentPage, itemsPerPage, toast]);
-
-  const handleAthleteChange = (e) => {
-    setSelectedAthleteId(e.target.value);
-    setCurrentPage(1);
-  };
 
   const handlePageChange = (newPage) => {
     setCurrentPage(newPage);

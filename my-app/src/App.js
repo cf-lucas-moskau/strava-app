@@ -11,6 +11,7 @@ import PaceCalculator from "./PaceCalculator"; // Assuming this is the component
 import RunView from "./components/RunView";
 import UpdateNotification from "./components/UpdateNotification";
 import AdminPage from "./components/AdminPage";
+import Profile from "./components/Profile";
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
         <Route path="/run/:id" element={<RunView />} />
         <Route path="/callback" element={<Home />} />
         <Route path="/admin" element={<Home admin={true} />} />
+        <Route path="/profile" element={<Home profile={true} />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Router>

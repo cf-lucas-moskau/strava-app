@@ -1,70 +1,98 @@
-# Getting Started with Create React App
+# Strava Training App
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A web application for managing training plans and tracking achievements for runners, built with React and Firebase.
 
-## Available Scripts
+## Features
 
-In the project directory, you can run:
+- 🏃‍♂️ Strava integration for activity tracking
+- 📊 Training plan management
+- ⭐ Achievement system with rewards
+- 👥 Admin dashboard for managing multiple athletes
+- 🎯 Progress tracking and statistics
 
-### `npm start`
+## Planned Features & TODOs
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+### Achievement System Enhancements
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+- [ ] Personalized achievements with specific start dates
 
-### `npm test`
+  - Allow setting custom start dates for achievement tracking
+  - Enable achievement tracking based on athlete's training plan start date
+  - Add ability to create custom achievement periods
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+- [ ] Enhanced reward system for achievements
+  - Implement tiered star rewards for achievements
+  - Add bonus stars for exceptional achievements
+  - Create special rewards for milestone achievements
+  - Scale star rewards based on achievement difficulty
 
-### `npm run build`
+### Cosmetic System & Profile
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+- [ ] Enhanced chest rewards system
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+  - Add cosmetic skins as possible rewards from chests
+  - Create different rarity tiers for cosmetic items
+  - Implement special event-themed cosmetics
+  - Add animated cosmetic effects
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+- [ ] Profile customization system
 
-### `npm run eject`
+  - Create dedicated profile section for each athlete
+  - Add inventory system for managing collected cosmetics
+  - Allow equipping/unequipping cosmetic items
+  - Display currently active cosmetics
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+- [ ] Cosmetic categories
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+  - Profile picture frames and overlays
+  - Custom backgrounds for home page
+  - Activity card themes
+  - Achievement badge styles
+  - Special effects for milestone celebrations
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+- [ ] Profile showcase features
+  - Display equipped cosmetics
+  - Show collection progress
+  - Highlight rare/limited cosmetics
+  - Share profile customization with other athletes
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+### Communication Features
 
-## Learn More
+- [ ] Activity commenting system
+  - Add comment functionality to individual activities
+  - Allow athletes to provide feedback on training sessions
+  - Enable communication about specific events during runs
+  - Include option for injury/difficulty reporting
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+### Future Enhancements
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+- [ ] Weekly/monthly achievement summaries
+- [ ] Achievement leaderboards
+- [ ] Social sharing of achievements
+- [ ] Custom achievement creation for admins
+- [ ] Achievement notification system
 
-### Code Splitting
+## Development
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+### Prerequisites
 
-### Analyzing the Bundle Size
+- Node.js
+- Firebase account
+- Strava API credentials
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+### Setup
 
-### Making a Progressive Web App
+1. Clone the repository
+2. Install dependencies: `npm install`
+3. Configure environment variables
+4. Run development server: `npm start`
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+## Contributing
 
-### Advanced Configuration
+Feel free to add more todos or suggest improvements by:
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+1. Creating an issue
+2. Submitting a pull request
+3. Updating this README
 
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+## License
