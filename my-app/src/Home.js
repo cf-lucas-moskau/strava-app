@@ -11,11 +11,23 @@ import {
 import { claimToken, checkAndUpdateClaimedTokens } from "./utils/tokens";
 import { hasTrainingPlan } from "./utils/training";
 import { handleLogin, handleAuthorizationCallback, logout } from "./utils/auth";
-import { fetchActivities, updateActivityOnStrava } from "./utils/activities";
+import {
+  fetchActivities,
+  updateActivityOnStrava,
+  fetchGroupActivities,
+} from "./utils/activities";
 import { getUserProfile, getAvailableCosmetics } from "./utils/cosmetics";
 import axios from "axios";
 
-import { Box, Flex, Text, Button, Spinner } from "@chakra-ui/react";
+import {
+  Box,
+  Flex,
+  Text,
+  Button,
+  Spinner,
+  ButtonGroup,
+  VStack,
+} from "@chakra-ui/react";
 import Activity from "./components/Activity";
 import { RepeatIcon } from "@chakra-ui/icons";
 import Header from "./components/Header";
@@ -59,6 +71,12 @@ function Home({ admin, profile }) {
 
   const [userProfile, setUserProfile] = useState(null);
   const [cosmetics, setCosmetics] = useState({});
+
+  const [feedType, setFeedType] = useState("group"); // 'group' or 'own'
+  const [groupActivities, setGroupActivities] = useState([]);
+  const [loadingGroupActivities, setLoadingGroupActivities] = useState(false);
+
+  const [runnerProfiles, setRunnerProfiles] = useState({});
 
   // Initialize app data
   useEffect(() => {
@@ -267,6 +285,70 @@ function Home({ admin, profile }) {
 
   const tokenDisplay = getTokenDisplay();
 
+  // Add new useEffect for fetching group activities
+  useEffect(() => {
+    const fetchGroupFeed = async () => {
+      if (!athlete?.id) return;
+
+      setLoadingGroupActivities(true);
+      try {
+        const activities = await fetchGroupActivities(athlete.id);
+        setGroupActivities(activities);
+      } catch (error) {
+        console.error("Error fetching group activities:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load group activities",
+          status: "error",
+          duration: 3000,
+          isClosable: true,
+        });
+      } finally {
+        setLoadingGroupActivities(false);
+      }
+    };
+
+    if (feedType === "group") {
+      fetchGroupFeed();
+    }
+  }, [athlete?.id, feedType]);
+
+  // Add new useEffect for fetching runner profiles
+  useEffect(() => {
+    const fetchRunnerProfiles = async () => {
+      if (!activities || !groupActivities) return;
+
+      const allActivities = [...(activities || []), ...groupActivities];
+      const uniqueAthleteIds = [
+        ...new Set(allActivities.map((a) => a.athlete.id)),
+      ];
+
+      console.log("Fetching profiles for athletes:", uniqueAthleteIds);
+
+      const profiles = {};
+      await Promise.all(
+        uniqueAthleteIds.map(async (athleteId) => {
+          try {
+            const profile = await getUserProfile(athleteId);
+            if (profile?.name) {
+              profiles[athleteId] = profile;
+            }
+          } catch (error) {
+            console.error(
+              `Error fetching profile for athlete ${athleteId}:`,
+              error
+            );
+          }
+        })
+      );
+
+      console.log("Fetched runner profiles:", profiles);
+      setRunnerProfiles(profiles);
+    };
+
+    fetchRunnerProfiles();
+  }, [activities, groupActivities]);
+
   if (!athlete) {
     return (
       <Box>
@@ -451,25 +533,55 @@ function Home({ admin, profile }) {
             px={containerPadding}
             mt={8}
           >
-            <div className="activity-div">
-              {activities &&
-                athlete &&
-                activities.length > 0 &&
-                activities
-                  .sort(
-                    (a, b) =>
-                      new Date(b.start_date_local) -
-                      new Date(a.start_date_local)
-                  )
-                  .map((activity) => (
-                    <Activity
-                      key={activity.id}
-                      activity={activity}
-                      loadSingleActivity={loadSingleActivity}
-                      theme={getEquippedTheme()}
-                    />
-                  ))}
-            </div>
+            <Flex justify="space-between" align="center" mb={6}>
+              <ButtonGroup isAttached variant="outline">
+                <Button
+                  onClick={() => setFeedType("group")}
+                  colorScheme={feedType === "group" ? "teal" : "gray"}
+                >
+                  Group Feed
+                </Button>
+                <Button
+                  onClick={() => setFeedType("own")}
+                  colorScheme={feedType === "own" ? "teal" : "gray"}
+                >
+                  My Activities
+                </Button>
+              </ButtonGroup>
+            </Flex>
+
+            {(loadingActivities || loadingGroupActivities) && (
+              <Flex justifyContent="center" my={4}>
+                <Spinner color="teal.500" />
+              </Flex>
+            )}
+
+            <Box>
+              {/* Activities Feed */}
+              <VStack spacing={4} align="stretch">
+                {feedType === "own"
+                  ? // My Activities
+                    activities?.map((activity) => (
+                      <Activity
+                        key={activity.id}
+                        activity={activity}
+                        runnerProfile={runnerProfiles[activity.athlete.id]}
+                        currentUser={athlete}
+                        cosmetics={cosmetics}
+                      />
+                    ))
+                  : // Group Activities
+                    groupActivities?.map((activity) => (
+                      <Activity
+                        key={activity.id}
+                        activity={activity}
+                        runnerProfile={runnerProfiles[activity.athlete.id]}
+                        currentUser={athlete}
+                        cosmetics={cosmetics}
+                      />
+                    ))}
+              </VStack>
+            </Box>
           </Box>
         </>
       )}

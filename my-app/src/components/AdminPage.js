@@ -38,9 +38,21 @@ import {
   Input,
   VStack,
   Flex,
+  IconButton,
+  Tag,
+  TagLabel,
+  TagCloseButton,
 } from "@chakra-ui/react";
 import { database } from "../firebase-config";
-import { ref, onValue, off, set, remove } from "firebase/database";
+import {
+  ref,
+  onValue,
+  off,
+  set,
+  remove,
+  update,
+  push,
+} from "firebase/database";
 import Header from "./Header";
 import { handleLogin } from "../utils/auth";
 import { ChevronDownIcon, AddIcon } from "@chakra-ui/icons";
@@ -51,6 +63,7 @@ import {
 } from "../utils/admin";
 import TrainingPlanManager from "./TrainingPlanManager";
 import { initializeSampleCosmetics } from "../utils/cosmetics";
+import GroupsManager from "./GroupsManager";
 
 const AdminPage = ({ athlete }) => {
   const [requests, setRequests] = useState([]);
@@ -63,6 +76,8 @@ const AdminPage = ({ athlete }) => {
     email: "",
   });
   const [isResettingCosmetics, setIsResettingCosmetics] = useState(false);
+  const [groups, setGroups] = useState([]);
+  const [athletes, setAthletes] = useState([]);
   const toast = useToast();
 
   useEffect(() => {
@@ -70,41 +85,62 @@ const AdminPage = ({ athlete }) => {
       return;
     }
 
+    // Set up real-time listener for requests
     const requestsRef = ref(database, "trainingPlanRequests");
-    console.log("Setting up listener for training plan requests");
-
-    onValue(
-      requestsRef,
-      (snapshot) => {
-        console.log("Received snapshot:", snapshot.val());
-        if (snapshot.exists()) {
-          const requestsData = snapshot.val();
-          const requestsArray = Object.entries(requestsData).map(
-            ([id, data]) => ({
-              id,
-              ...data,
-            })
-          );
-          requestsArray.sort(
-            (a, b) => new Date(b.requestDate) - new Date(a.requestDate)
-          );
-          console.log("Processed requests:", requestsArray);
-          setRequests(requestsArray);
-        } else {
-          console.log("No requests found in snapshot");
-          setRequests([]);
-        }
-        setLoading(false);
-      },
-      (error) => {
-        console.error("Error fetching requests:", error);
-        setLoading(false);
+    onValue(requestsRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const requestsData = snapshot.val();
+        const requestsArray = Object.entries(requestsData).map(
+          ([id, data]) => ({
+            id,
+            ...data,
+          })
+        );
+        setRequests(requestsArray);
+      } else {
+        setRequests([]);
       }
-    );
+      setLoading(false);
+    });
 
+    // Set up real-time listener for groups
+    const groupsRef = ref(database, "groups");
+    onValue(groupsRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const groupsData = snapshot.val();
+        const groupsArray = Object.entries(groupsData).map(([id, data]) => ({
+          id,
+          ...data,
+          memberCount: data.members ? Object.keys(data.members).length : 0,
+        }));
+        setGroups(groupsArray);
+      } else {
+        setGroups([]);
+      }
+    });
+
+    // Set up real-time listener for athletes
+    const athletesRef = ref(database, "athleteActivitiesMeta");
+    onValue(athletesRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const athletesData = snapshot.val();
+        const athletesArray = Object.entries(athletesData).map(
+          ([id, data]) => ({
+            id,
+            ...data,
+          })
+        );
+        setAthletes(athletesArray);
+      } else {
+        setAthletes([]);
+      }
+    });
+
+    // Cleanup listeners
     return () => {
-      console.log("Cleaning up listener");
       off(requestsRef);
+      off(groupsRef);
+      off(athletesRef);
     };
   }, [athlete]);
 
@@ -263,6 +299,7 @@ const AdminPage = ({ athlete }) => {
                 </Badge>
               )}
             </Tab>
+            <Tab>Groups</Tab>
           </TabList>
 
           <TabPanels>
@@ -363,6 +400,9 @@ const AdminPage = ({ athlete }) => {
                   </Table>
                 </Box>
               )}
+            </TabPanel>
+            <TabPanel>
+              <GroupsManager groups={groups} athletes={athletes} />
             </TabPanel>
           </TabPanels>
         </Tabs>

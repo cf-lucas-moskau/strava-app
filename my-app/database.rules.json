@@ -7,6 +7,47 @@
         ".write": "auth != null && auth.uid == $uid"
       }
     },
+    "kudos": {
+      "$activityId": {
+        ".read": "auth != null",
+        ".write": "auth != null",
+        "$userId": {
+          ".validate": "newData.isBoolean()"
+        }
+      }
+    },
+    "comments": {
+      "$activityId": {
+        ".read": "auth != null",
+        ".write": "auth != null",
+        "$commentId": {
+          ".validate": "newData.hasChildren(['text', 'authorId', 'timestamp'])",
+          "text": {
+            ".validate": "newData.isString() && newData.val().length <= 500"
+          },
+          "authorId": { ".validate": "newData.isString()" },
+          "timestamp": { ".validate": "newData.isString()" }
+        }
+      }
+    },
+    "notifications": {
+      "$userId": {
+        ".read": "auth != null && auth.uid == $userId",
+        ".write": "auth != null",
+        "$notificationId": {
+          ".validate": "newData.hasChildren(['type', 'timestamp', 'activityId', 'fromUser'])",
+          "type": {
+            ".validate": "newData.isString() && (newData.val() == 'kudos' || newData.val() == 'comment')"
+          },
+          "timestamp": { ".validate": "newData.isString()" },
+          "activityId": { ".validate": "newData.isString()" },
+          "fromUser": {
+            ".validate": "newData.hasChildren(['id', 'name', 'picture'])"
+          },
+          "text": { ".validate": "!newData.exists() || newData.isString()" }
+        }
+      }
+    },
     "cosmetics": {
       ".read": "auth != null",
       ".write": "auth != null && auth.uid == '32945540'",
@@ -16,10 +57,29 @@
         }
       }
     },
+    "groups": {
+      ".read": "auth != null",
+      ".write": "auth != null && auth.uid == '32945540'",
+      "$groupId": {
+        ".validate": "newData.hasChildren(['name', 'createdAt'])",
+        "members": {
+          "$memberId": {
+            ".validate": "newData.hasChildren(['addedAt'])"
+          }
+        }
+      }
+    },
     "profiles": {
       "$uid": {
         ".read": "auth != null",
         ".write": "auth != null && auth.uid == $uid",
+        ".validate": "newData.hasChildren(['name', 'picture', 'lastStravaSync'])",
+        "name": { ".validate": "newData.isString()" },
+        "picture": { ".validate": "newData.isString()" },
+        "lastStravaSync": { ".validate": "newData.isString()" },
+        "city": { ".validate": "!newData.exists() || newData.isString()" },
+        "state": { ".validate": "!newData.exists() || newData.isString()" },
+        "country": { ".validate": "!newData.exists() || newData.isString()" },
         "inventory": {
           ".read": "auth != null",
           ".write": "auth != null && auth.uid == $uid"
@@ -51,6 +111,7 @@
       "$athleteId": {
         ".read": "auth != null && (auth.uid == $athleteId || auth.uid == '32945540')",
         ".write": "auth != null && auth.uid == $athleteId",
+        ".indexOn": ["id"],
         "$activityId": {
           ".validate": "newData.hasChildren(['id', 'type', 'start_date_local', 'distance'])"
         }

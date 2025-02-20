@@ -29,11 +29,23 @@ export const getAvailableCosmetics = async () => {
 };
 
 // Get a user's profile including inventory and equipped items
-export const getUserProfile = async (userId) => {
+export const getUserProfile = async (userId, athleteData = null) => {
   try {
+    console.log("Fetching profile for user:", userId);
+    if (athleteData) {
+      console.log("Athlete data provided:", {
+        name: `${athleteData.firstname} ${athleteData.lastname}`,
+        picture: athleteData.profile,
+        city: athleteData.city,
+        state: athleteData.state,
+        country: athleteData.country,
+      });
+    }
+
     const profileRef = ref(database, `profiles/${userId}`);
     const snapshot = await get(profileRef);
-    return snapshot.exists()
+
+    let profile = snapshot.exists()
       ? snapshot.val()
       : {
           inventory: {},
@@ -44,8 +56,64 @@ export const getUserProfile = async (userId) => {
             tokenStyle: null,
           },
         };
+
+    console.log("Current profile data:", profile);
+
+    // If we have athlete data, check if we need to update the profile
+    if (athleteData) {
+      const shouldUpdate =
+        !profile.lastStravaSync ||
+        !profile.name ||
+        profile.name !== `${athleteData.firstname} ${athleteData.lastname}` ||
+        !profile.picture ||
+        profile.picture !== athleteData.profile;
+
+      console.log("Profile update needed:", shouldUpdate);
+      if (shouldUpdate) {
+        console.log("Updating profile with new data...");
+        console.log("Update reasons:", {
+          noLastSync: !profile.lastStravaSync,
+          noName: !profile.name,
+          nameMismatch:
+            profile.name !== `${athleteData.firstname} ${athleteData.lastname}`,
+          noPicture: !profile.picture,
+          pictureMismatch: profile.picture !== athleteData.profile,
+        });
+
+        const updates = {
+          name: `${athleteData.firstname} ${athleteData.lastname}`,
+          picture: athleteData.profile,
+          lastStravaSync: new Date().toISOString(),
+          city: athleteData.city || null,
+          state: athleteData.state || null,
+          country: athleteData.country || null,
+          // Preserve existing data
+          inventory: profile.inventory || {},
+          equipped: profile.equipped || {
+            profileFrame: null,
+            background: null,
+            activityTheme: null,
+            tokenStyle: null,
+          },
+        };
+
+        await set(profileRef, updates);
+        profile = updates;
+        console.log("Profile updated successfully:", profile);
+      } else {
+        console.log("Profile is up to date, no changes needed");
+      }
+    }
+
+    return profile;
   } catch (error) {
-    console.error("Error fetching user profile:", error);
+    console.error("Error in getUserProfile:", error);
+    console.error("Error details:", {
+      userId,
+      athleteDataPresent: !!athleteData,
+      errorMessage: error.message,
+      errorStack: error.stack,
+    });
     return null;
   }
 };

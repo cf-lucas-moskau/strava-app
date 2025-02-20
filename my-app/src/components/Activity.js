@@ -9,16 +9,26 @@ import {
   VStack,
   HStack,
   Divider,
+  Avatar,
+  Link,
 } from "@chakra-ui/react";
+import { Link as RouterLink } from "react-router-dom";
 import RoutePreview from "./RoutePreview";
 import {
   formatMeterToKilometer,
   formatPace,
   formatDuration,
 } from "../utils/formatters";
+import ActivitySocial from "./ActivitySocial";
 
-function Activity({ activity, loadSingleActivity, theme }) {
-  // Responsive values
+function Activity({
+  activity,
+  loadSingleActivity,
+  runnerProfile,
+  currentUser,
+  theme = null,
+  cosmetics,
+}) {
   const isMobile = useBreakpointValue({ base: true, md: false });
   const routePreviewSize = useBreakpointValue({
     base: "150px",
@@ -29,18 +39,29 @@ function Activity({ activity, loadSingleActivity, theme }) {
   const stackSpacing = useBreakpointValue({ base: 2, md: 4 });
   const contentPadding = useBreakpointValue({ base: 3, md: 4 });
 
-  // Apply theme styles if available
+  // Default theme styles
+  const defaultStyles = {
+    backgroundColor: "white",
+    borderColor: "gray.200",
+    boxShadow: "sm",
+    headingColor: "gray.800",
+    textColor: "gray.600",
+    statsBackgroundColor: "gray.50",
+  };
+
+  // Use theme styles if provided, otherwise use defaults
   const themeStyles = theme
     ? {
-        borderColor: theme.borderColor || "gray.200",
-        bg: theme.backgroundColor || "white",
-        boxShadow: theme.boxShadow || "md",
-        headingColor: theme.headingColor || "inherit",
-        textColor: theme.textColor || "gray.600",
-        statsBg: theme.statsBackgroundColor || "transparent",
+        backgroundColor: theme.backgroundColor || defaultStyles.backgroundColor,
+        borderColor: theme.borderColor || defaultStyles.borderColor,
+        boxShadow: theme.boxShadow || defaultStyles.boxShadow,
+        headingColor: theme.headingColor || defaultStyles.headingColor,
+        textColor: theme.textColor || defaultStyles.textColor,
+        statsBackgroundColor:
+          theme.statsBackgroundColor || defaultStyles.statsBackgroundColor,
         gradientOverlay: theme.gradientOverlay,
       }
-    : {};
+    : defaultStyles;
 
   const ActivityStats = () => (
     <Stack
@@ -50,14 +71,14 @@ function Activity({ activity, loadSingleActivity, theme }) {
       justify={isMobile ? "flex-start" : "space-between"}
       divider={isMobile ? <Divider /> : null}
       py={2}
-      bg={themeStyles.statsBg}
+      bg={themeStyles.statsBackgroundColor}
       borderRadius="md"
     >
       <HStack spacing={2}>
         <Text fontWeight="medium" color={themeStyles.textColor} minWidth="70px">
           Distance:
         </Text>
-        <Text color={themeStyles.textColor}>
+        <Text color={themeStyles.headingColor}>
           {formatMeterToKilometer(activity.distance)}
         </Text>
       </HStack>
@@ -65,7 +86,7 @@ function Activity({ activity, loadSingleActivity, theme }) {
         <Text fontWeight="medium" color={themeStyles.textColor} minWidth="70px">
           Pace:
         </Text>
-        <Text color={themeStyles.textColor}>
+        <Text color={themeStyles.headingColor}>
           {formatPace(activity.average_speed)} /km
         </Text>
       </HStack>
@@ -73,11 +94,65 @@ function Activity({ activity, loadSingleActivity, theme }) {
         <Text fontWeight="medium" color={themeStyles.textColor} minWidth="70px">
           Time:
         </Text>
-        <Text color={themeStyles.textColor}>
+        <Text color={themeStyles.headingColor}>
           {formatDuration(activity.elapsed_time)}
         </Text>
       </HStack>
     </Stack>
+  );
+
+  const RunnerInfo = () => (
+    <Flex align="center" gap={3} mb={3}>
+      <Box position="relative">
+        {runnerProfile?.picture && (
+          <Avatar
+            size="md"
+            src={runnerProfile?.picture}
+            name={runnerProfile?.name || "Unknown Runner"}
+          />
+        )}
+        {runnerProfile?.equipped?.profileFrame &&
+          cosmetics?.[runnerProfile.equipped.profileFrame] && (
+            <Box
+              position="absolute"
+              top="-4px"
+              left="-4px"
+              right="-4px"
+              bottom="-4px"
+              backgroundImage={`url(${
+                cosmetics?.[runnerProfile.equipped.profileFrame]?.preview
+              })`}
+              backgroundSize="contain"
+              backgroundPosition="center"
+              backgroundRepeat="no-repeat"
+              pointerEvents="none"
+            />
+          )}
+      </Box>
+      {runnerProfile ? (
+        <VStack align="start" spacing={0}>
+          <Text fontWeight="medium" color={themeStyles.headingColor}>
+            {runnerProfile.name}
+          </Text>
+          <Text fontSize="sm" color={themeStyles.textColor}>
+            {runnerProfile.city || runnerProfile.state || runnerProfile.country}
+          </Text>
+        </VStack>
+      ) : (
+        <VStack align="start" spacing={0}>
+          <Text fontWeight="medium" color="orange.500">
+            Runner needs to head to{" "}
+            <Link as={RouterLink} to="/profile" color="blue.500">
+              /profile
+            </Link>{" "}
+            first
+          </Text>
+          <Text fontSize="sm" color={themeStyles.textColor}>
+            Profile not set up
+          </Text>
+        </VStack>
+      )}
+    </Flex>
   );
 
   return (
@@ -89,11 +164,11 @@ function Activity({ activity, loadSingleActivity, theme }) {
       overflow="hidden"
       padding={contentPadding}
       marginBottom={6}
-      bg={themeStyles.bg}
+      position="relative"
       _hover={{ boxShadow: "lg" }}
       transition="all 0.2s"
-      position="relative"
     >
+      {/* Background image and overlay */}
       {themeStyles.gradientOverlay && (
         <Box
           position="absolute"
@@ -107,77 +182,91 @@ function Activity({ activity, loadSingleActivity, theme }) {
         />
       )}
 
-      <Stack
-        direction={isMobile ? "column" : "row"}
-        spacing={stackSpacing}
-        width="100%"
-      >
-        {/* Route preview */}
-        <Box width={isMobile ? "100%" : routePreviewSize} flexShrink={0}>
-          <RoutePreview
-            summaryPolyline={activity.map.summary_polyline}
-            height={routePreviewSize}
-            type={activity.type}
-            theme={theme}
-          />
-        </Box>
+      {/* Content */}
+      <Box position="relative" zIndex={2}>
+        <RunnerInfo />
 
-        {/* Activity details */}
-        <Stack flex="1" spacing={3}>
-          <Flex
-            justify="space-between"
-            align={isMobile ? "flex-start" : "center"}
-            direction={isMobile ? "column" : "row"}
-            gap={2}
-          >
-            {/* Date and Location */}
-            <VStack align={isMobile ? "flex-start" : "flex-start"} spacing={1}>
-              <Text fontSize="sm" color={themeStyles.textColor}>
-                {new Date(activity.start_date_local).toLocaleString()}
-              </Text>
-              {(activity.location_city ||
-                activity.location_state ||
-                activity.location_country) && (
-                <Text fontSize="sm" color={themeStyles.textColor}>
-                  {activity.location_city ||
-                    activity.location_state ||
-                    activity.location_country}
-                </Text>
-              )}
-            </VStack>
+        <Stack
+          direction={isMobile ? "column" : "row"}
+          spacing={stackSpacing}
+          width="100%"
+        >
+          {/* Route preview */}
+          <Box width={isMobile ? "100%" : routePreviewSize} flexShrink={0}>
+            <RoutePreview
+              summaryPolyline={activity.map.summary_polyline}
+              height={routePreviewSize}
+              type={activity.type}
+              theme={themeStyles}
+            />
+          </Box>
 
-            {/* Title and Description */}
-            <Stack
-              spacing={2}
-              flex="1"
-              align={isMobile ? "flex-start" : "flex-end"}
-              width={isMobile ? "100%" : "auto"}
+          {/* Activity details */}
+          <Stack flex="1" spacing={3}>
+            <Flex
+              justify="space-between"
+              align={isMobile ? "flex-start" : "center"}
+              direction={isMobile ? "column" : "row"}
+              gap={2}
             >
-              <Stack spacing={1} width="100%">
-                <Heading
-                  as="h3"
-                  size={headingSize}
-                  cursor="pointer"
-                  onClick={() => loadSingleActivity(activity.id)}
-                  _hover={{ color: "teal.500" }}
-                  color={themeStyles.headingColor}
-                >
-                  {activity.name}
-                </Heading>
-                {activity.description && (
+              {/* Date and Location */}
+              <VStack
+                align={isMobile ? "flex-start" : "flex-start"}
+                spacing={1}
+              >
+                <Text fontSize="sm" color={themeStyles.textColor}>
+                  {new Date(activity.start_date_local).toLocaleString()}
+                </Text>
+                {(activity.location_city ||
+                  activity.location_state ||
+                  activity.location_country) && (
                   <Text fontSize="sm" color={themeStyles.textColor}>
-                    {activity.description}
+                    {activity.location_city ||
+                      activity.location_state ||
+                      activity.location_country}
                   </Text>
                 )}
-              </Stack>
-            </Stack>
-          </Flex>
+              </VStack>
 
-          <Box borderTopWidth="1px" borderColor={themeStyles.borderColor}>
-            <ActivityStats />
-          </Box>
+              {/* Title and Description */}
+              <Stack
+                spacing={2}
+                flex="1"
+                align={isMobile ? "flex-start" : "flex-end"}
+                width={isMobile ? "100%" : "auto"}
+              >
+                <Stack spacing={1} width="100%">
+                  <Heading
+                    as="h3"
+                    size={headingSize}
+                    cursor="pointer"
+                    onClick={() => loadSingleActivity(activity.id)}
+                    _hover={{ color: "teal.500" }}
+                    color={themeStyles.headingColor}
+                  >
+                    {activity.name}
+                  </Heading>
+                  {activity.description && (
+                    <Text fontSize="sm" color={themeStyles.textColor}>
+                      {activity.description}
+                    </Text>
+                  )}
+                </Stack>
+              </Stack>
+            </Flex>
+
+            <Box borderTopWidth="1px" borderColor={themeStyles.borderColor}>
+              <ActivityStats />
+            </Box>
+          </Stack>
         </Stack>
-      </Stack>
+
+        {/* <ActivitySocial
+          activity={activity}
+          currentUser={currentUser}
+          runnerProfile={runnerProfile}
+        /> */}
+      </Box>
     </Box>
   );
 }

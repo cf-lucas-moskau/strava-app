@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { Box, Flex, Text, Spinner } from "@chakra-ui/react";
+import { Box, Flex, Text, Spinner, Button } from "@chakra-ui/react";
+import { ChevronDownIcon, ChevronUpIcon } from "@chakra-ui/icons";
 import {
   formatMeterToKilometer,
   formatDuration,
@@ -13,6 +14,7 @@ import {
 const UnmatchedRuns = ({ athlete, activities, weekOffset, getWeekLabel }) => {
   const [weeklyTrainings, setWeeklyTrainings] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
     const fetchTrainings = async () => {
@@ -73,47 +75,54 @@ const UnmatchedRuns = ({ athlete, activities, weekOffset, getWeekLabel }) => {
             )}
           </Text>
         </Box>
-        <Text fontSize="sm" color="gray.500">
-          These runs weren't matched to any training plan items
-        </Text>
+        <Button
+          onClick={() => setIsExpanded(!isExpanded)}
+          variant="ghost"
+          rightIcon={isExpanded ? <ChevronUpIcon /> : <ChevronDownIcon />}
+          size="sm"
+        >
+          {isExpanded ? "Hide" : "Show"} Unmatched Runs
+        </Button>
       </Flex>
 
-      <Box>
-        {unmatchedActivities.map((activity) => (
-          <Flex
-            key={activity.id}
-            p={3}
-            borderWidth="1px"
-            borderRadius="md"
-            mb={2}
-            justify="space-between"
-            align="center"
-            _hover={{ bg: "gray.50" }}
-          >
-            <Box>
-              <Text fontWeight="medium">{activity.name}</Text>
-              <Text fontSize="sm" color="gray.600">
-                {new Date(activity.start_date_local).toLocaleDateString()} at{" "}
-                {new Date(activity.start_date_local).toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </Text>
-            </Box>
-            <Flex gap={4} align="center">
-              <Text color="gray.700">
-                {formatMeterToKilometer(activity.distance)}
-              </Text>
-              <Text color="gray.700">
-                {formatDuration(activity.moving_time)}
-              </Text>
-              <Text color="gray.700">
-                {metersPerSecondsToPace(activity.average_speed)} /km
-              </Text>
+      {isExpanded && (
+        <Box>
+          {unmatchedActivities.map((activity) => (
+            <Flex
+              key={activity.id}
+              p={3}
+              borderWidth="1px"
+              borderRadius="md"
+              mb={2}
+              justify="space-between"
+              align="center"
+              _hover={{ bg: "gray.50" }}
+            >
+              <Box>
+                <Text fontWeight="medium">{activity.name}</Text>
+                <Text fontSize="sm" color="gray.600">
+                  {new Date(activity.start_date_local).toLocaleDateString()} at{" "}
+                  {new Date(activity.start_date_local).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </Text>
+              </Box>
+              <Flex gap={4} align="center">
+                <Text color="gray.700">
+                  {formatMeterToKilometer(activity.distance)}
+                </Text>
+                <Text color="gray.700">
+                  {formatDuration(activity.moving_time)}
+                </Text>
+                <Text color="gray.700">
+                  {metersPerSecondsToPace(activity.average_speed)} /km
+                </Text>
+              </Flex>
             </Flex>
-          </Flex>
-        ))}
-      </Box>
+          ))}
+        </Box>
+      )}
     </Box>
   );
 };

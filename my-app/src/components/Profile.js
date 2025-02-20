@@ -85,28 +85,46 @@ const Profile = ({ athlete, activities }) => {
 
   useEffect(() => {
     const fetchData = async () => {
+      if (!athlete?.id) {
+        console.log("No athlete ID available, skipping profile fetch");
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
+      console.log("Starting profile data fetch for athlete:", athlete.id);
       try {
-        const [profileData, cosmeticsData] = await Promise.all([
-          getUserProfile(athlete.id),
+        console.log("Fetching profile and cosmetics data...");
+        const [profile, availableCosmetics] = await Promise.all([
+          getUserProfile(athlete.id, athlete),
           getAvailableCosmetics(),
         ]);
 
-        // Ensure profile data has the correct structure
-        const initializedProfile = {
-          inventory: profileData?.inventory || {},
-          equipped: {
-            profileFrame: profileData?.equipped?.profileFrame || null,
-            background: profileData?.equipped?.background || null,
-            activityTheme: profileData?.equipped?.activityTheme || null,
-            tokenStyle: profileData?.equipped?.tokenStyle || null,
-          },
-        };
+        console.log("Data fetch complete:", {
+          profileReceived: !!profile,
+          cosmeticsReceived: !!availableCosmetics,
+          profileData: profile,
+          cosmeticsCount: Object.keys(availableCosmetics || {}).length,
+        });
 
-        setProfile(initializedProfile);
-        setCosmetics(cosmeticsData || {});
+        if (profile) {
+          console.log("Setting profile state:", profile);
+          setProfile(profile);
+        }
+        if (availableCosmetics) {
+          console.log("Setting cosmetics state:", {
+            count: Object.keys(availableCosmetics).length,
+            types: Object.values(availableCosmetics).map((c) => c.type),
+          });
+          setCosmetics(availableCosmetics);
+        }
       } catch (error) {
-        console.error("Error fetching profile data:", error);
+        console.error("Error in Profile fetchData:", error);
+        console.error("Error details:", {
+          athleteId: athlete.id,
+          errorMessage: error.message,
+          errorStack: error.stack,
+        });
         toast({
           title: "Error",
           description: "Failed to load profile data",
@@ -115,13 +133,12 @@ const Profile = ({ athlete, activities }) => {
           isClosable: true,
         });
       } finally {
+        console.log("Setting loading state to false");
         setLoading(false);
       }
     };
 
-    if (athlete?.id) {
-      fetchData();
-    }
+    fetchData();
   }, [athlete, toast]);
 
   // Calculate achievements when activities change
