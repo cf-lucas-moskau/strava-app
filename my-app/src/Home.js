@@ -18,6 +18,7 @@ import {
 } from "./utils/activities";
 import { getUserProfile, getAvailableCosmetics } from "./utils/cosmetics";
 import axios from "axios";
+import { getAuth, signOut } from "firebase/auth";
 
 import {
   Box,
@@ -38,6 +39,7 @@ import UnmatchedRuns from "./components/UnmatchedRuns";
 import RequestTrainingPlan from "./components/RequestTrainingPlan";
 import AdminPage from "./components/AdminPage";
 import Profile from "./components/Profile";
+import { getValidAccessToken } from "./utils/auth";
 
 function Home({ admin, profile }) {
   const navigate = useNavigate();
@@ -78,6 +80,15 @@ function Home({ admin, profile }) {
 
   const [runnerProfiles, setRunnerProfiles] = useState({});
 
+  // Function to handle logging out
+  const handleLogout = async () => {
+    try {
+      await logout(setAthlete, setAccessToken, navigate, toast);
+    } catch (error) {
+      console.error("Error logging out:", error);
+    }
+  };
+
   // Initialize app data
   useEffect(() => {
     const init = async () => {
@@ -87,7 +98,6 @@ function Home({ admin, profile }) {
         // Try to load data from IndexedDB first
         const storedAthlete = await getAthleteFromDB();
         const storedActivities = await getActivities();
-        const storedAccessToken = localStorage.getItem("accessToken");
 
         // Set stored data if available
         if (storedAthlete) {
@@ -95,9 +105,6 @@ function Home({ admin, profile }) {
         }
         if (storedActivities && storedActivities.length > 0) {
           setActivities(storedActivities);
-        }
-        if (storedAccessToken) {
-          setAccessToken(storedAccessToken);
         }
 
         // Only handle authorization if we're on the callback route
@@ -111,11 +118,21 @@ function Home({ admin, profile }) {
           return;
         }
 
-        // If we don't have an access token, we're not authenticated
+        // Check for valid access token and logout if not found
+        const storedAccessToken = await getValidAccessToken(
+          storedAthlete?.id,
+          setAthlete,
+          setAccessToken,
+          navigate,
+          toast
+        );
+
         if (!storedAccessToken) {
-          console.log("No access token found, user needs to log in");
-          return;
+          console.log("No valid access token found");
+          return; // The getValidAccessToken function will handle logout for us
         }
+
+        setAccessToken(storedAccessToken);
 
         // If we have a token but no athlete data, fetch it from Strava
         if (storedAccessToken && !storedAthlete) {
@@ -134,11 +151,8 @@ function Home({ admin, profile }) {
           } catch (error) {
             console.error("Error fetching athlete data:", error);
             if (error.response?.status === 401) {
-              // Token is invalid, clear everything
-              localStorage.removeItem("accessToken");
-              setAccessToken("");
-              setAthlete(null);
-              await clearData();
+              // Token is invalid, logout
+              handleLogout();
             }
           }
         }
@@ -174,7 +188,10 @@ function Home({ admin, profile }) {
         athlete,
         accessToken,
         setLoadingActivities,
-        toast
+        toast,
+        setAthlete,
+        setAccessToken,
+        navigate
       );
       if (newActivities) {
         setActivities(newActivities);

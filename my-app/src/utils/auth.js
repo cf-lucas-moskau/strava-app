@@ -1,5 +1,6 @@
 import axios from "axios";
 import { saveAthlete, clearData } from "./db";
+import { getAuth, signOut } from "firebase/auth";
 
 export const handleLogin = () => {
   const clientId = "107512";
@@ -106,33 +107,82 @@ export const refreshAccessToken = async (
 };
 
 export const getValidAccessToken = async (
+  athleteId,
   setAthlete = null,
-  setAccessToken = null
+  setAccessToken = null,
+  navigate = null,
+  toast = null
 ) => {
   const currentTime = Math.floor(Date.now() / 1000);
   const expiresAt = parseInt(localStorage.getItem("tokenExpiresAt"));
   const accessToken = localStorage.getItem("accessToken");
 
+  // If token is missing entirely
+  if (!accessToken) {
+    console.log("No access token found, user needs to log in");
+    if (setAthlete && setAccessToken) {
+      // Only attempt to logout if we have the setter functions
+      await logout(setAthlete, setAccessToken, navigate, toast);
+    }
+    return null;
+  }
+
   // If token is expired or will expire in the next 5 minutes
-  if (!accessToken || !expiresAt || currentTime > expiresAt - 300) {
+  if (!expiresAt || currentTime > expiresAt - 300) {
     try {
       return await refreshAccessToken(setAthlete, setAccessToken);
     } catch (error) {
-      // If refresh fails, the user will already be logged out by refreshAccessToken
-      throw new Error("Failed to refresh access token");
+      console.error("Failed to refresh access token:", error);
+      if (setAthlete && setAccessToken) {
+        // Only attempt to logout if we have the setter functions
+        await logout(setAthlete, setAccessToken, navigate, toast);
+      }
+      return null;
     }
   }
 
   return accessToken;
 };
 
-export const logout = async (setAthlete, setAccessToken) => {
-  setAthlete(null);
-  setAccessToken("");
-  localStorage.removeItem("accessToken");
-  localStorage.removeItem("refreshToken");
-  localStorage.removeItem("tokenExpiresAt");
-  await clearData();
+export const logout = async (setAthlete, setAccessToken, navigate, toast) => {
+  try {
+    // Firebase signout
+    const auth = getAuth();
+    await signOut(auth);
+
+    // Clear state
+    setAthlete(null);
+    setAccessToken("");
+
+    // Clear localStorage
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("refreshToken");
+    localStorage.removeItem("tokenExpiresAt");
+
+    // Clear IndexedDB data
+    await clearData();
+
+    // Show notification if toast is provided
+    if (toast) {
+      toast({
+        title: "Logged out",
+        description: "You have been logged out successfully.",
+        status: "info",
+        duration: 5000,
+        isClosable: true,
+      });
+    }
+
+    // Navigate to login if navigate function is provided
+    if (navigate) {
+      navigate("/");
+    }
+  } catch (error) {
+    console.error("Error during logout:", error);
+    // Still attempt to clear everything even if there was an error
+    setAthlete?.(null);
+    setAccessToken?.("");
+  }
 };
 
 export const getMailString = (athlete) => {

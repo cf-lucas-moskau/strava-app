@@ -18,7 +18,8 @@ export const fetchActivities = async (
   setLoadingActivities,
   toast,
   setAthlete,
-  setAccessToken
+  setAccessToken,
+  navigate
 ) => {
   if (!athlete) {
     toast({
@@ -35,7 +36,18 @@ export const fetchActivities = async (
   setLoadingActivities(true);
   try {
     // Get a valid access token
-    const validToken = await getValidAccessToken(setAthlete, setAccessToken);
+    const validToken = await getValidAccessToken(
+      athlete.id,
+      setAthlete,
+      setAccessToken,
+      navigate,
+      toast
+    );
+
+    if (!validToken) {
+      setLoadingActivities(false);
+      return null; // Token validation failed and logout was handled
+    }
 
     const response = await axios.get(
       "https://www.strava.com/api/v3/athlete/activities",
@@ -95,11 +107,24 @@ export const updateActivityOnStrava = async (
   { title, description },
   accessToken,
   setAthlete,
-  setAccessToken
+  setAccessToken,
+  navigate,
+  toast,
+  athleteId
 ) => {
   try {
     // Get a valid access token
-    const validToken = await getValidAccessToken(setAthlete, setAccessToken);
+    const validToken = await getValidAccessToken(
+      athleteId,
+      setAthlete,
+      setAccessToken,
+      navigate,
+      toast
+    );
+
+    if (!validToken) {
+      return null; // Token validation failed and logout was handled
+    }
 
     const response = await fetch(
       `https://www.strava.com/api/v3/activities/${activityId}`,
