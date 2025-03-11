@@ -18,7 +18,6 @@ import {
 } from "./utils/activities";
 import { getUserProfile, getAvailableCosmetics } from "./utils/cosmetics";
 import axios from "axios";
-import { getAuth, signOut } from "firebase/auth";
 
 import {
   Box,
