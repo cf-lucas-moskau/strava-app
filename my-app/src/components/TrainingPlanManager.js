@@ -59,15 +59,20 @@ import {
   Skeleton,
   Progress,
   Code,
+  SimpleGrid,
+  useColorModeValue,
 } from "@chakra-ui/react";
 import {
-  AddIcon,
   DeleteIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   EditIcon,
   CheckIcon,
   InfoOutlineIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+  CloseIcon,
+  AddIcon,
 } from "@chakra-ui/icons";
 import { database } from "../firebase-config";
 import { ref, onValue, off, get } from "firebase/database";
@@ -118,6 +123,27 @@ const TrainingPlanManager = ({ athlete }) => {
 
   const promptSummaryRef = useRef("");
   const toast = useToast();
+
+  // Move useColorModeValue hooks to the top level
+  const cellBgColor = useColorModeValue("gray.50", "gray.700");
+  const trainingBgColor = useColorModeValue("white", "gray.600");
+
+  const [expandedWeekIndex, setExpandedWeekIndex] = useState(null);
+  const [expandedTraining, setExpandedTraining] = useState(null);
+  const [addingTrainingDay, setAddingTrainingDay] = useState(null);
+  const [quickAddTraining, setQuickAddTraining] = useState({
+    title: "",
+    description: "",
+    distance: 5000,
+    type: "run",
+    intensity: "medium",
+  });
+
+  const [apiKey, setApiKey] = useState(
+    localStorage.getItem("openrouterApiKey") || ""
+  );
+  const [chatHistory, setChatHistory] = useState([]);
+  const [currentPrompt, setCurrentPrompt] = useState("");
 
   useEffect(() => {
     if (!athlete || athlete.id !== ADMIN_ATHLETE_ID) return;
@@ -375,8 +401,44 @@ const TrainingPlanManager = ({ athlete }) => {
     return pages;
   };
 
+  // Add new function to handle API key changes
+  const handleApiKeyChange = (e) => {
+    const newKey = e.target.value;
+    setApiKey(newKey);
+    localStorage.setItem("openrouterApiKey", newKey);
+  };
+
+  // Add new function to format training display
+  const formatTrainingDisplay = (trainings) => {
+    if (!Array.isArray(trainings)) return trainings;
+
+    return trainings
+      .map((training) => {
+        const date = new Date(training.day);
+        const formattedDate = date.toLocaleDateString("en-US", {
+          weekday: "short",
+          month: "short",
+          day: "numeric",
+        });
+
+        return `${formattedDate}: ${training.title}
+• ${(training.distance / 1000).toFixed(1)}km ${training.type} (${
+          training.intensity
+        })
+• ${training.description}`;
+      })
+      .join("\n\n");
+  };
+
+  // Add new function to handle suggestion buttons
+  const handleSuggestionClick = (suggestion) => {
+    setCurrentPrompt(suggestion);
+    generateTrainingSuggestion();
+  };
+
+  // Modify the generateTrainingSuggestion function to handle suggestions
   const generateTrainingSuggestion = async () => {
-    if (!promptText.trim()) {
+    if (!currentPrompt.trim()) {
       toast({
         title: "Error",
         description: "Please enter a prompt for the training suggestion",
@@ -398,6 +460,25 @@ const TrainingPlanManager = ({ athlete }) => {
       return;
     }
 
+    if (!apiKey) {
+      toast({
+        title: "Error",
+        description: "Please enter your OpenRouter API key",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    // Add user message to chat history
+    const userMessage = {
+      role: "user",
+      content: currentPrompt,
+      timestamp: new Date().toISOString(),
+    };
+    setChatHistory((prev) => [...prev, userMessage]);
+
     // Prepare AI prompt with previous trainings if requested
     let trainingHistory = "";
     if (showHistory && previousTrainings.length > 0) {
@@ -417,9 +498,23 @@ const TrainingPlanManager = ({ athlete }) => {
     );
     const systemPrompt = `You are an expert running coach who creates structured weekly training plans. 
               
-    Your task is to create a week of training (6-9 sessions) based on the athlete's goals. 
+    Your task is to create a week of training (6-9 sessions) based on the athlete's goals.
+
+    You follow the latest research in training. Meaning that you should be aware of:
+    - Threshold running
+    - Double Threshold runs
+    - Tempo runs
+    - Long Slow Distance (LSD)
+    - Hill work
+    - Tempo work
+    - Interval work
+    - LT1 and LT2 running
     
-    Always format your response as a valid JSON array of training objects.
+    Always format your response as a valid JSON object with two fields:
+    1. "trainings": an array of training objects
+    2. "suggestions": an array of strings with suggestions for improvements to the training plan. These are not suggestions to improve the overall training, but specific to the training plan. For example you could suggest that the focus on Threshold runs could be higher with the suggestion "Increase the focus on Threshold runs".
+    This should then lead to you generating a new training plan that addresses the suggestions.
+    
     Each training object must have these fields:
     - title: short descriptive title
     - description: detailed instructions for the workout
@@ -434,45 +529,144 @@ const TrainingPlanManager = ({ athlete }) => {
     3. Precisely matches the athlete's requested total weekly distance
     4. Includes any specific workouts the athlete has requested
     5. Distributes training load appropriately (e.g., more rest before/after key sessions)
-    
-    Do not include ANY text outside of the JSON array.`;
 
-    const userPrompt = `Create a week of training for athlete ${
-      selectedAthlete?.name || selectedAthleteId
-    }.
-    
-    My requirements: ${promptText}
-    
-    Today's date is ${new Date().toISOString().split("T")[0]}.
-    Generate 6-9 training sessions spanning the next 7 days.
-    
-    ${
-      showHistory && previousTrainings.length > 0
-        ? `Here are the athlete's ${previousTrainings.length} most recent training sessions (for context on their typical training patterns):\n\n${trainingHistory}`
-        : ""
-    }`;
+    Here are some example interactions to demonstrate the expected format and quality:
 
-    // Store prompt for summary
-    promptSummaryRef.current = {
-      system: systemPrompt,
-      user: userPrompt,
-    };
+    Example 1:
+    User: "I want to run 80km this week with a focus on threshold training. I have a 10k race in 2 weeks."
+    Assistant: {
+      "trainings": [
+        {
+          "title": "Threshold Intervals",
+          "description": "4x2km at threshold pace (LT2) with 2min recovery. Include 2km warm-up and cool-down. Focus on maintaining consistent pace across intervals.",
+          "distance": 12000,
+          "day": "2024-03-25",
+          "type": "tempo",
+          "intensity": "hard"
+        },
+        {
+          "title": "Recovery Run",
+          "description": "Easy-paced recovery run at LT1. Keep heart rate low and focus on proper form.",
+          "distance": 8000,
+          "day": "2024-03-26",
+          "type": "recovery",
+          "intensity": "easy"
+        },
+        {
+          "title": "Double Threshold",
+          "description": "2x15min at threshold pace with 5min recovery between. Include 2km warm-up and cool-down. This session helps build race-specific endurance.",
+          "distance": 10000,
+          "day": "2024-03-27",
+          "type": "tempo",
+          "intensity": "hard"
+        },
+        {
+          "title": "Easy Run",
+          "description": "Steady-state run at LT1. Focus on maintaining a conversational pace.",
+          "distance": 10000,
+          "day": "2024-03-28",
+          "type": "run",
+          "intensity": "easy"
+        },
+        {
+          "title": "Race Simulation",
+          "description": "5x1km at 10k race pace with 2min recovery. Include 2km warm-up and cool-down. This session helps prepare for race day.",
+          "distance": 9000,
+          "day": "2024-03-29",
+          "type": "interval",
+          "intensity": "hard"
+        },
+        {
+          "title": "Long Run",
+          "description": "Long run with the last 5km at threshold pace. This builds endurance while incorporating race-specific pace.",
+          "distance": 20000,
+          "day": "2024-03-30",
+          "type": "run",
+          "intensity": "medium"
+        },
+        {
+          "title": "Recovery Run",
+          "description": "Very easy recovery run to aid in recovery from the long run.",
+          "distance": 8000,
+          "day": "2024-03-31",
+          "type": "recovery",
+          "intensity": "easy"
+        }
+      ],
+      "suggestions": [
+        "Consider adding more hill work to build strength for the 10k race",
+        "The threshold sessions could be more race-specific with shorter intervals at race pace",
+        "Add more recovery time between hard sessions to ensure proper adaptation"
+      ]
+    }
 
-    // Show prompt summary modal
-    onPromptSummaryOpen();
+    Example 2:
+    User: "I need a recovery week after a hard training block. I want to run 60km this week with mostly easy runs."
+    Assistant: {
+      "trainings": [
+        {
+          "title": "Easy Recovery Run",
+          "description": "Very easy-paced run at LT1. Keep heart rate low and focus on proper form.",
+          "distance": 8000,
+          "day": "2024-03-25",
+          "type": "recovery",
+          "intensity": "easy"
+        },
+        {
+          "title": "Steady State Run",
+          "description": "Moderate-paced run at LT1. Keep the effort comfortable and conversational.",
+          "distance": 10000,
+          "day": "2024-03-26",
+          "type": "run",
+          "intensity": "easy"
+        },
+        {
+          "title": "Recovery Run",
+          "description": "Easy-paced recovery run with focus on form and relaxation.",
+          "distance": 8000,
+          "day": "2024-03-27",
+          "type": "recovery",
+          "intensity": "easy"
+        },
+        {
+          "title": "Light Tempo",
+          "description": "Short, controlled tempo run at LT2. Keep the effort moderate and focus on form.",
+          "distance": 12000,
+          "day": "2024-03-28",
+          "type": "tempo",
+          "intensity": "medium"
+        },
+        {
+          "title": "Recovery Run",
+          "description": "Very easy recovery run to aid in recovery from the tempo session.",
+          "distance": 8000,
+          "day": "2024-03-29",
+          "type": "recovery",
+          "intensity": "easy"
+        },
+        {
+          "title": "Long Run",
+          "description": "Long run at an easy pace. Keep the effort comfortable throughout.",
+          "distance": 14000,
+          "day": "2024-03-30",
+          "type": "run",
+          "intensity": "easy"
+        }
+      ],
+      "suggestions": [
+        "Consider adding some light strides at the end of easy runs to maintain some speed",
+        "The recovery week could benefit from more cross-training activities",
+        "Monitor recovery metrics and adjust intensity if needed"
+      ]
+    }
+    
+    Do not include ANY text outside of the JSON object.`;
 
     setIsGenerating(true);
-    setGenerationProgress(10); // Start progress
+    setGenerationProgress(10);
 
     try {
-      // Get OpenRouter API key from your environment or a secure storage
-      const apiKey = process.env.REACT_APP_OPENROUTER_API_KEY;
-
-      if (!apiKey) {
-        throw new Error("OpenRouter API key not found");
-      }
-
-      setGenerationProgress(30); // Indicate progress
+      setGenerationProgress(30);
 
       const response = await fetch(
         "https://openrouter.ai/api/v1/chat/completions",
@@ -481,8 +675,8 @@ const TrainingPlanManager = ({ athlete }) => {
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${apiKey}`,
-            "HTTP-Referer": window.location.href, // Required by OpenRouter
-            "X-Title": "Strava Training Plan Manager", // Optional
+            "HTTP-Referer": window.location.href,
+            "X-Title": "Strava Training Plan Manager",
           },
           body: JSON.stringify({
             model: "gpt-3.5-turbo",
@@ -491,16 +685,20 @@ const TrainingPlanManager = ({ athlete }) => {
                 role: "system",
                 content: systemPrompt,
               },
+              ...chatHistory.map((msg) => ({
+                role: msg.role,
+                content: msg.content,
+              })),
               {
                 role: "user",
-                content: userPrompt,
+                content: currentPrompt,
               },
             ],
           }),
         }
       );
 
-      setGenerationProgress(70); // Indicate progress
+      setGenerationProgress(70);
 
       if (!response.ok) {
         throw new Error(`API request failed with status ${response.status}`);
@@ -513,29 +711,27 @@ const TrainingPlanManager = ({ athlete }) => {
         throw new Error("No content returned from AI");
       }
 
-      setGenerationProgress(85); // Indicate progress
+      setGenerationProgress(85);
 
-      // Extract JSON from the response (handle potential formatting issues)
-      let jsonMatch;
+      // Parse the AI response
+      let parsedResponse;
       try {
-        // First try to parse the whole response as JSON
-        const parsedTrainings = JSON.parse(aiContent);
-        jsonMatch = Array.isArray(parsedTrainings)
-          ? parsedTrainings
-          : [parsedTrainings];
+        parsedResponse = JSON.parse(aiContent);
       } catch (e) {
-        // If that fails, try to extract JSON using regex
-        const jsonRegex = /\[[\s\S]*\]/;
-        const match = aiContent.match(jsonRegex);
-        if (match) {
-          jsonMatch = JSON.parse(match[0]);
-        } else {
-          throw new Error("Could not extract valid JSON from AI response");
-        }
+        throw new Error("Could not parse AI response as JSON");
       }
 
-      // Validate the generated trainings (remove time field)
-      const validatedTrainings = jsonMatch.map((training) => ({
+      // Add AI response to chat history with formatted trainings
+      const aiMessage = {
+        role: "assistant",
+        content: formatTrainingDisplay(parsedResponse.trainings),
+        suggestions: parsedResponse.suggestions || [],
+        timestamp: new Date().toISOString(),
+      };
+      setChatHistory((prev) => [...prev, aiMessage]);
+
+      // Extract and validate trainings
+      const validatedTrainings = parsedResponse.trainings.map((training) => ({
         title: training.title || "AI Generated Training",
         description: training.description || "",
         distance: parseInt(training.distance) || 5000,
@@ -557,7 +753,7 @@ const TrainingPlanManager = ({ athlete }) => {
       // Sort by date
       validatedTrainings.sort((a, b) => new Date(a.day) - new Date(b.day));
 
-      setGenerationProgress(100); // Complete progress
+      setGenerationProgress(100);
       setGeneratedTrainings(validatedTrainings);
 
       toast({
@@ -569,6 +765,9 @@ const TrainingPlanManager = ({ athlete }) => {
         duration: 3000,
         isClosable: true,
       });
+
+      // Clear the current prompt
+      setCurrentPrompt("");
     } catch (error) {
       console.error("Error generating training suggestion:", error);
       toast({
@@ -646,6 +845,171 @@ const TrainingPlanManager = ({ athlete }) => {
       toast({
         title: "Error",
         description: "Failed to add AI-generated trainings",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+    }
+  };
+
+  // Helper function to group trainings by week
+  const groupTrainingsByWeek = (trainings) => {
+    if (!trainings || trainings.length === 0) return [];
+
+    // Sort trainings by date
+    const sortedTrainings = [...trainings].sort(
+      (a, b) => new Date(a.day) - new Date(b.day)
+    );
+
+    // Group by week (using the Monday of each week as key)
+    const weeks = {};
+    sortedTrainings.forEach((training) => {
+      const trainingDate = new Date(training.day);
+      const dayOfWeek = trainingDate.getDay(); // 0 is Sunday, 1 is Monday, etc.
+
+      // Calculate Monday of this week (to use as key)
+      const mondayDate = new Date(trainingDate);
+      mondayDate.setDate(
+        trainingDate.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1)
+      );
+      const weekKey = mondayDate.toISOString().split("T")[0];
+
+      if (!weeks[weekKey]) {
+        weeks[weekKey] = {
+          startDate: mondayDate,
+          days: Array(7)
+            .fill(null)
+            .map(() => []),
+        };
+      }
+
+      // Place training in correct day of week (0 = Monday in our array)
+      const dayIndex = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+      weeks[weekKey].days[dayIndex].push(training);
+    });
+
+    // Convert to array and sort by week start date
+    return Object.values(weeks).sort((a, b) => a.startDate - b.startDate);
+  };
+
+  // Toggle expanded week
+  const toggleWeekExpansion = (weekIndex) => {
+    if (expandedWeekIndex === weekIndex) {
+      setExpandedWeekIndex(null);
+    } else {
+      setExpandedWeekIndex(weekIndex);
+    }
+    // Reset expanded training when changing week view
+    setExpandedTraining(null);
+  };
+
+  // Toggle expanded training details
+  const toggleTrainingExpansion = (training) => {
+    if (
+      expandedTraining &&
+      expandedTraining.day === training.day &&
+      expandedTraining.title === training.title &&
+      expandedTraining.distance === training.distance
+    ) {
+      setExpandedTraining(null);
+    } else {
+      setExpandedTraining(training);
+    }
+  };
+
+  // Close expanded training details
+  const closeTrainingDetails = () => {
+    setExpandedTraining(null);
+  };
+
+  // Start adding a new training to a specific day
+  const startAddingTraining = (dayDate, e) => {
+    e.stopPropagation();
+    // Format the date as YYYY-MM-DD for the form
+    const formattedDate = dayDate.toISOString().split("T")[0];
+    setAddingTrainingDay(formattedDate);
+    setQuickAddTraining({
+      ...quickAddTraining,
+      day: formattedDate,
+    });
+    // Close any expanded training details
+    setExpandedTraining(null);
+  };
+
+  // Cancel adding a new training
+  const cancelAddingTraining = (e) => {
+    if (e) e.stopPropagation();
+    setAddingTrainingDay(null);
+    setQuickAddTraining({
+      title: "",
+      description: "",
+      distance: 5000,
+      type: "run",
+      intensity: "medium",
+    });
+  };
+
+  // Quick add a new training directly from the calendar
+  const quickAddNewTraining = async (e) => {
+    e.stopPropagation();
+
+    if (!selectedAthleteId) {
+      toast({
+        title: "Error",
+        description: "Please select an athlete first",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    if (!quickAddTraining.title.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a title for the training",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    const trainingToAdd = {
+      ...quickAddTraining,
+      day: addingTrainingDay,
+    };
+
+    try {
+      const updatedTrainings = [...trainings, trainingToAdd];
+
+      if (trainings.length === 0) {
+        await createTrainingPlan(selectedAthleteId, athlete.id, [
+          trainingToAdd,
+        ]);
+      } else {
+        await updateTrainingPlan(
+          selectedAthleteId,
+          athlete.id,
+          updatedTrainings
+        );
+      }
+
+      setTrainings(updatedTrainings);
+      cancelAddingTraining();
+
+      toast({
+        title: "Success",
+        description: "Training added successfully",
+        status: "success",
+        duration: 3000,
+        isClosable: true,
+      });
+    } catch (error) {
+      console.error("Error adding training:", error);
+      toast({
+        title: "Error",
+        description: "Failed to add training",
         status: "error",
         duration: 3000,
         isClosable: true,
@@ -771,15 +1135,81 @@ const TrainingPlanManager = ({ athlete }) => {
                 bg="gray.50"
               >
                 <Heading as="h4" size="sm" mb={3}>
-                  Generate AI Weekly Training Plan
+                  AI Training Plan Generator
                 </Heading>
 
+                {/* API Key Input */}
+                <FormControl mb={4}>
+                  <FormLabel>OpenRouter API Key</FormLabel>
+                  <Input
+                    type="password"
+                    value={apiKey}
+                    onChange={handleApiKeyChange}
+                    placeholder="Enter your OpenRouter API key"
+                  />
+                  <Text fontSize="sm" color="gray.500" mt={1}>
+                    Your API key is stored locally and will persist between
+                    sessions.
+                  </Text>
+                </FormControl>
+
+                {/* Chat History */}
+                <Box
+                  mb={4}
+                  maxH="300px"
+                  overflowY="auto"
+                  borderWidth="1px"
+                  borderRadius="md"
+                  p={3}
+                  bg="white"
+                >
+                  {chatHistory.map((message, index) => (
+                    <Box
+                      key={index}
+                      mb={3}
+                      p={2}
+                      borderRadius="md"
+                      bg={message.role === "user" ? "blue.50" : "gray.50"}
+                    >
+                      <Text fontSize="sm" fontWeight="bold" mb={1}>
+                        {message.role === "user" ? "You" : "AI"}
+                      </Text>
+                      <Text fontSize="sm" whiteSpace="pre-wrap">
+                        {message.content}
+                      </Text>
+                      {message.suggestions &&
+                        message.suggestions.length > 0 && (
+                          <Box mt={2}>
+                            <Text fontSize="xs" fontWeight="bold" mb={1}>
+                              Suggestions:
+                            </Text>
+                            <Flex flexWrap="wrap" gap={2}>
+                              {message.suggestions.map((suggestion, idx) => (
+                                <Button
+                                  key={idx}
+                                  size="xs"
+                                  colorScheme="blue"
+                                  variant="outline"
+                                  onClick={() =>
+                                    handleSuggestionClick(suggestion)
+                                  }
+                                >
+                                  {suggestion}
+                                </Button>
+                              ))}
+                            </Flex>
+                          </Box>
+                        )}
+                    </Box>
+                  ))}
+                </Box>
+
                 <FormControl mb={3}>
-                  <FormLabel>Weekly Training Requirements</FormLabel>
+                  <FormLabel>Your Training Requirements</FormLabel>
                   <Textarea
                     placeholder="Describe your training goals for the week (e.g., 'I want to run 120km this week with 3 key sessions: Tuesday 6×1 mile intervals, Saturday marathon-specific long run, and Thursday hill repeats')"
-                    value={promptText}
-                    onChange={(e) => setPromptText(e.target.value)}
+                    value={currentPrompt}
+                    onChange={(e) => setCurrentPrompt(e.target.value)}
                     rows={4}
                   />
                 </FormControl>
@@ -1038,6 +1468,7 @@ const TrainingPlanManager = ({ athlete }) => {
                                 </Text>
                                 <Flex align="center">
                                   <Badge
+                                    size="xs"
                                     colorScheme={
                                       training.type === "interval"
                                         ? "red"
@@ -1047,7 +1478,7 @@ const TrainingPlanManager = ({ athlete }) => {
                                         ? "green"
                                         : "blue"
                                     }
-                                    mr={2}
+                                    mr={1}
                                   >
                                     {training.type}
                                   </Badge>
@@ -1224,6 +1655,588 @@ const TrainingPlanManager = ({ athlete }) => {
                 </Button>
               </Box>
 
+              {trainings.length > 0 && (
+                <Box borderWidth="1px" borderRadius="lg" p={4}>
+                  <Heading as="h3" size="md" mb={4}>
+                    Current Training Plan (Calendar View)
+                  </Heading>
+
+                  <Box overflowX="auto">
+                    {/* Calendar Header */}
+                    <SimpleGrid
+                      columns={7}
+                      mb={2}
+                      fontWeight="bold"
+                      textAlign="center"
+                    >
+                      <Box p={2}>Monday</Box>
+                      <Box p={2}>Tuesday</Box>
+                      <Box p={2}>Wednesday</Box>
+                      <Box p={2}>Thursday</Box>
+                      <Box p={2}>Friday</Box>
+                      <Box p={2}>Saturday</Box>
+                      <Box p={2}>Sunday</Box>
+                    </SimpleGrid>
+
+                    {/* Calendar Body */}
+                    <VStack spacing={4} align="stretch">
+                      {groupTrainingsByWeek(trainings).map(
+                        (week, weekIndex) => (
+                          <Box key={weekIndex}>
+                            <Flex
+                              justify="space-between"
+                              align="center"
+                              mb={1}
+                              p={2}
+                              borderRadius="md"
+                              bg="gray.100"
+                              cursor="pointer"
+                              onClick={() => toggleWeekExpansion(weekIndex)}
+                            >
+                              <Text fontWeight="bold">
+                                Week of{" "}
+                                {week.startDate.toLocaleDateString("en-US", {
+                                  month: "short",
+                                  day: "numeric",
+                                })}
+                                {expandedWeekIndex === weekIndex ? (
+                                  <ChevronUpIcon ml={1} />
+                                ) : (
+                                  <ChevronDownIcon ml={1} />
+                                )}
+                              </Text>
+                              <Text fontSize="sm">
+                                {week.days.flat().length} training
+                                {week.days.flat().length !== 1 ? "s" : ""}
+                              </Text>
+                            </Flex>
+
+                            <SimpleGrid
+                              columns={7}
+                              gap={2}
+                              templateColumns="repeat(7, 1fr)"
+                            >
+                              {week.days.map((dayTrainings, dayIndex) => {
+                                // Calculate the actual date for this day
+                                const dayDate = new Date(week.startDate);
+                                dayDate.setDate(
+                                  week.startDate.getDate() + dayIndex
+                                );
+                                const formattedDate = dayDate
+                                  .toISOString()
+                                  .split("T")[0];
+                                const isAddingToThisDay =
+                                  addingTrainingDay === formattedDate;
+
+                                return (
+                                  <Box
+                                    key={dayIndex}
+                                    borderWidth="1px"
+                                    borderRadius="md"
+                                    bg={cellBgColor}
+                                    p={2}
+                                    minHeight={
+                                      expandedWeekIndex === weekIndex
+                                        ? "200px"
+                                        : "120px"
+                                    }
+                                    position="relative"
+                                    transition="min-height 0.2s"
+                                  >
+                                    {/* Day header with plus button */}
+                                    <Flex
+                                      justify="space-between"
+                                      align="center"
+                                      mb={1}
+                                    >
+                                      <Text fontSize="xs" fontWeight="medium">
+                                        {dayDate.getDate()}
+                                      </Text>
+                                      <IconButton
+                                        icon={<AddIcon />}
+                                        size="xs"
+                                        aria-label="Add training"
+                                        onClick={(e) =>
+                                          startAddingTraining(dayDate, e)
+                                        }
+                                      />
+                                    </Flex>
+
+                                    {/* Quick add training form */}
+                                    {isAddingToThisDay && (
+                                      <Box
+                                        borderWidth="1px"
+                                        borderRadius="md"
+                                        p={2}
+                                        bg="white"
+                                        mb={2}
+                                        boxShadow="md"
+                                      >
+                                        <VStack spacing={2} align="stretch">
+                                          <FormControl isRequired>
+                                            <FormLabel fontSize="xs">
+                                              Title
+                                            </FormLabel>
+                                            <Input
+                                              size="xs"
+                                              value={quickAddTraining.title}
+                                              onChange={(e) =>
+                                                setQuickAddTraining({
+                                                  ...quickAddTraining,
+                                                  title: e.target.value,
+                                                })
+                                              }
+                                              placeholder="Training title"
+                                              onClick={(e) =>
+                                                e.stopPropagation()
+                                              }
+                                            />
+                                          </FormControl>
+
+                                          <FormControl>
+                                            <FormLabel fontSize="xs">
+                                              Distance (m)
+                                            </FormLabel>
+                                            <NumberInput
+                                              size="xs"
+                                              value={quickAddTraining.distance}
+                                              min={1000}
+                                              step={500}
+                                              onChange={(value) =>
+                                                setQuickAddTraining({
+                                                  ...quickAddTraining,
+                                                  distance: parseInt(value),
+                                                })
+                                              }
+                                              onClick={(e) =>
+                                                e.stopPropagation()
+                                              }
+                                            >
+                                              <NumberInputField />
+                                              <NumberInputStepper>
+                                                <NumberIncrementStepper />
+                                                <NumberDecrementStepper />
+                                              </NumberInputStepper>
+                                            </NumberInput>
+                                          </FormControl>
+
+                                          <Grid
+                                            templateColumns="1fr 1fr"
+                                            gap={1}
+                                          >
+                                            <FormControl>
+                                              <FormLabel fontSize="xs">
+                                                Type
+                                              </FormLabel>
+                                              <Select
+                                                size="xs"
+                                                value={quickAddTraining.type}
+                                                onChange={(e) =>
+                                                  setQuickAddTraining({
+                                                    ...quickAddTraining,
+                                                    type: e.target.value,
+                                                  })
+                                                }
+                                                onClick={(e) =>
+                                                  e.stopPropagation()
+                                                }
+                                              >
+                                                <option value="run">Run</option>
+                                                <option value="tempo">
+                                                  Tempo
+                                                </option>
+                                                <option value="interval">
+                                                  Interval
+                                                </option>
+                                                <option value="recovery">
+                                                  Recovery
+                                                </option>
+                                              </Select>
+                                            </FormControl>
+
+                                            <FormControl>
+                                              <FormLabel fontSize="xs">
+                                                Intensity
+                                              </FormLabel>
+                                              <Select
+                                                size="xs"
+                                                value={
+                                                  quickAddTraining.intensity
+                                                }
+                                                onChange={(e) =>
+                                                  setQuickAddTraining({
+                                                    ...quickAddTraining,
+                                                    intensity: e.target.value,
+                                                  })
+                                                }
+                                                onClick={(e) =>
+                                                  e.stopPropagation()
+                                                }
+                                              >
+                                                <option value="easy">
+                                                  Easy
+                                                </option>
+                                                <option value="medium">
+                                                  Medium
+                                                </option>
+                                                <option value="hard">
+                                                  Hard
+                                                </option>
+                                              </Select>
+                                            </FormControl>
+                                          </Grid>
+
+                                          <FormControl>
+                                            <FormLabel fontSize="xs">
+                                              Description
+                                            </FormLabel>
+                                            <Textarea
+                                              size="xs"
+                                              value={
+                                                quickAddTraining.description
+                                              }
+                                              onChange={(e) =>
+                                                setQuickAddTraining({
+                                                  ...quickAddTraining,
+                                                  description: e.target.value,
+                                                })
+                                              }
+                                              placeholder="Training description"
+                                              rows={2}
+                                              onClick={(e) =>
+                                                e.stopPropagation()
+                                              }
+                                            />
+                                          </FormControl>
+
+                                          <Flex justify="flex-end" gap={2}>
+                                            <Button
+                                              size="xs"
+                                              onClick={cancelAddingTraining}
+                                            >
+                                              Cancel
+                                            </Button>
+                                            <Button
+                                              size="xs"
+                                              colorScheme="green"
+                                              onClick={quickAddNewTraining}
+                                            >
+                                              Save
+                                            </Button>
+                                          </Flex>
+                                        </VStack>
+                                      </Box>
+                                    )}
+
+                                    {/* Existing or no trainings */}
+                                    {dayTrainings.length === 0 &&
+                                    !isAddingToThisDay ? (
+                                      <Text fontSize="xs" color="gray.500">
+                                        No training
+                                      </Text>
+                                    ) : (
+                                      <VStack spacing={1} align="stretch">
+                                        {dayTrainings.map(
+                                          (training, trainingIndex) => {
+                                            const trainingKey = `${weekIndex}-${dayIndex}-${trainingIndex}`;
+                                            // Find the original index in the full trainings array
+                                            const originalIndex =
+                                              trainings.findIndex(
+                                                (t) =>
+                                                  t.day === training.day &&
+                                                  t.title === training.title &&
+                                                  t.distance ===
+                                                    training.distance
+                                              );
+
+                                            const isExpanded =
+                                              expandedWeekIndex === weekIndex;
+                                            const isDetailExpanded =
+                                              expandedTraining &&
+                                              expandedTraining.day ===
+                                                training.day &&
+                                              expandedTraining.title ===
+                                                training.title &&
+                                              expandedTraining.distance ===
+                                                training.distance;
+
+                                            return (
+                                              <Box
+                                                key={trainingKey}
+                                                p={1}
+                                                borderRadius="sm"
+                                                borderLeftWidth="4px"
+                                                borderLeftColor={
+                                                  training.intensity === "hard"
+                                                    ? "red.400"
+                                                    : training.intensity ===
+                                                      "medium"
+                                                    ? "orange.400"
+                                                    : "green.400"
+                                                }
+                                                bg={trainingBgColor}
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  toggleTrainingExpansion(
+                                                    training
+                                                  );
+                                                }}
+                                                cursor="pointer"
+                                                position="relative"
+                                                zIndex={
+                                                  isDetailExpanded ? "2" : "1"
+                                                }
+                                                transition="all 0.2s"
+                                                _hover={{
+                                                  boxShadow: "sm",
+                                                  transform: "translateY(-1px)",
+                                                }}
+                                              >
+                                                <Flex
+                                                  justify="space-between"
+                                                  align="center"
+                                                >
+                                                  <Text
+                                                    fontSize="xs"
+                                                    fontWeight="bold"
+                                                    noOfLines={
+                                                      isExpanded ? 2 : 1
+                                                    }
+                                                  >
+                                                    {training.title}
+                                                  </Text>
+                                                  <Flex>
+                                                    {!isDetailExpanded && (
+                                                      <IconButton
+                                                        icon={<DeleteIcon />}
+                                                        size="xs"
+                                                        variant="ghost"
+                                                        colorScheme="red"
+                                                        aria-label="Delete training"
+                                                        onClick={(e) => {
+                                                          e.stopPropagation();
+                                                          handleDeleteTraining(
+                                                            originalIndex
+                                                          );
+                                                        }}
+                                                      />
+                                                    )}
+                                                  </Flex>
+                                                </Flex>
+
+                                                <Flex mt={1} fontSize="xs">
+                                                  <Badge
+                                                    size="xs"
+                                                    colorScheme={
+                                                      training.type ===
+                                                      "interval"
+                                                        ? "red"
+                                                        : training.type ===
+                                                          "tempo"
+                                                        ? "orange"
+                                                        : training.type ===
+                                                          "recovery"
+                                                        ? "green"
+                                                        : "blue"
+                                                    }
+                                                    mr={1}
+                                                  >
+                                                    {training.type}
+                                                  </Badge>
+                                                  <Text>
+                                                    {(
+                                                      training.distance / 1000
+                                                    ).toFixed(1)}
+                                                    km
+                                                  </Text>
+                                                </Flex>
+
+                                                {isExpanded && (
+                                                  <Collapse
+                                                    in={isExpanded}
+                                                    animateOpacity
+                                                  >
+                                                    <Text
+                                                      fontSize="xs"
+                                                      mt={1}
+                                                      noOfLines={3}
+                                                    >
+                                                      {training.description}
+                                                    </Text>
+                                                  </Collapse>
+                                                )}
+
+                                                {isDetailExpanded && (
+                                                  <Box
+                                                    position="absolute"
+                                                    top="100%"
+                                                    left="-1px"
+                                                    right="-1px"
+                                                    mt={1}
+                                                    p={3}
+                                                    borderWidth="1px"
+                                                    borderRadius="md"
+                                                    bg={trainingBgColor}
+                                                    boxShadow="md"
+                                                    zIndex="3"
+                                                  >
+                                                    <Flex
+                                                      justify="flex-end"
+                                                      mb={2}
+                                                    >
+                                                      <IconButton
+                                                        icon={<DeleteIcon />}
+                                                        size="xs"
+                                                        colorScheme="red"
+                                                        aria-label="Delete training"
+                                                        onClick={(e) => {
+                                                          e.stopPropagation();
+                                                          handleDeleteTraining(
+                                                            originalIndex
+                                                          );
+                                                          closeTrainingDetails();
+                                                        }}
+                                                        mr={1}
+                                                      />
+                                                      <IconButton
+                                                        icon={<CloseIcon />}
+                                                        size="xs"
+                                                        onClick={(e) => {
+                                                          e.stopPropagation();
+                                                          closeTrainingDetails();
+                                                        }}
+                                                      />
+                                                    </Flex>
+
+                                                    <Heading
+                                                      as="h5"
+                                                      size="xs"
+                                                      mb={2}
+                                                    >
+                                                      {training.title}
+                                                    </Heading>
+
+                                                    <SimpleGrid
+                                                      columns={2}
+                                                      spacing={2}
+                                                      mb={2}
+                                                    >
+                                                      <Box>
+                                                        <Text
+                                                          fontSize="xs"
+                                                          fontWeight="bold"
+                                                        >
+                                                          Date
+                                                        </Text>
+                                                        <Text fontSize="sm">
+                                                          {new Date(
+                                                            training.day
+                                                          ).toLocaleDateString(
+                                                            "en-US",
+                                                            {
+                                                              weekday: "long",
+                                                              month: "short",
+                                                              day: "numeric",
+                                                            }
+                                                          )}
+                                                        </Text>
+                                                      </Box>
+                                                      <Box>
+                                                        <Text
+                                                          fontSize="xs"
+                                                          fontWeight="bold"
+                                                        >
+                                                          Distance
+                                                        </Text>
+                                                        <Text fontSize="sm">
+                                                          {(
+                                                            training.distance /
+                                                            1000
+                                                          ).toFixed(1)}{" "}
+                                                          km
+                                                        </Text>
+                                                      </Box>
+                                                      <Box>
+                                                        <Text
+                                                          fontSize="xs"
+                                                          fontWeight="bold"
+                                                        >
+                                                          Type
+                                                        </Text>
+                                                        <Badge
+                                                          colorScheme={
+                                                            training.type ===
+                                                            "interval"
+                                                              ? "red"
+                                                              : training.type ===
+                                                                "tempo"
+                                                              ? "orange"
+                                                              : training.type ===
+                                                                "recovery"
+                                                              ? "green"
+                                                              : "blue"
+                                                          }
+                                                        >
+                                                          {training.type}
+                                                        </Badge>
+                                                      </Box>
+                                                      <Box>
+                                                        <Text
+                                                          fontSize="xs"
+                                                          fontWeight="bold"
+                                                        >
+                                                          Intensity
+                                                        </Text>
+                                                        <Badge
+                                                          colorScheme={
+                                                            training.intensity ===
+                                                            "hard"
+                                                              ? "red"
+                                                              : training.intensity ===
+                                                                "medium"
+                                                              ? "orange"
+                                                              : training.intensity ===
+                                                                "easy"
+                                                              ? "green"
+                                                              : "gray"
+                                                          }
+                                                        >
+                                                          {training.intensity}
+                                                        </Badge>
+                                                      </Box>
+                                                    </SimpleGrid>
+
+                                                    <Box>
+                                                      <Text
+                                                        fontSize="xs"
+                                                        fontWeight="bold"
+                                                        mb={1}
+                                                      >
+                                                        Description
+                                                      </Text>
+                                                      <Text fontSize="sm">
+                                                        {training.description}
+                                                      </Text>
+                                                    </Box>
+                                                  </Box>
+                                                )}
+                                              </Box>
+                                            );
+                                          }
+                                        )}
+                                      </VStack>
+                                    )}
+                                  </Box>
+                                );
+                              })}
+                            </SimpleGrid>
+                          </Box>
+                        )
+                      )}
+                    </VStack>
+                  </Box>
+                </Box>
+              )}
               <Box>
                 <Heading size="md" mb={4}>
                   Current Training Plan
